@@ -1,0 +1,3 @@
+# mcc
+
+Mediocre C compiler
