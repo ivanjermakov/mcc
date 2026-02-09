@@ -2,6 +2,3 @@
 
 build:
 	clang src/mcc.c -Wall -o build/mcc
-
-run: build
-	build/mcc
