@@ -5,3 +5,4 @@ PointerAlignment: Left
 ColumnLimit: 100
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: true
+BreakConstructorInitializers: true

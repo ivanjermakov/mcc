@@ -4,7 +4,7 @@
 
 int32_t main(int32_t argc, char* argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "missing file arguments\n");
+        fprintf(stderr, "usage:\n  mcc source out\n");
         return 1;
     }
     char* source_path = argv[1];
@@ -90,11 +90,9 @@ int32_t main(int32_t argc, char* argv[]) {
     sections_size += sizeof section_shstrtab;
 
     // TODO: complete ELF
-    memcpy(&elf_header[0x28], &section_header_table_offset, 8);
-    uint16_t header_count = 4;
-    memcpy(&elf_header[0x3C], &header_count, 2);
-    uint16_t shstr_index = 3;
-    memcpy(&elf_header[0x3E], &shstr_index, 2);
+    elf_header.shoff = section_header_table_offset;
+    elf_header.shnum = 4;
+    elf_header.shstrndx = 3;
 
     char* out_path = argv[2];
     FILE* out_file = fopen(out_path, "w");

@@ -38,12 +38,42 @@ const Operand RBP = {.tag = REGISTER, .o = {.reg = {.i = 5, .size = 64}}};
 const Operand RSI = {.tag = REGISTER, .o = {.reg = {.i = 6, .size = 64}}};
 const Operand RDI = {.tag = REGISTER, .o = {.reg = {.i = 7, .size = 64}}};
 
-// TODO: use structs instead of arrays
-uint8_t elf_header[0x40] = {
-    0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x01, 0x00, 0x3e, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0xAA, 0xAA, 0xAA, 0xAA,
+/**
+ * @see https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.eheader.html
+ * @see https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ELF_header
+ */
+typedef struct {
+    uint8_t ei_magic[4];
+    uint8_t ei_class;
+    uint8_t ei_data;
+    uint8_t ei_version;
+    uint8_t abi;
+    uint8_t pad[7];
+    uint16_t type;
+    uint16_t machine;
+    uint32_t version;
+    uint64_t entry;
+    uint64_t phoff;
+    uint64_t shoff;
+    uint32_t flags;
+    uint16_t ehsize;
+    uint16_t phentsize;
+    uint16_t phnum;
+    uint16_t shentsize;
+    uint16_t shnum;
+    uint16_t shstrndx;
+} ElfHeader;
+
+ElfHeader elf_header = {
+    .ei_magic = {0x7F, 0x45, 0x4C, 0x46},
+    .ei_class = 0x02,
+    .ei_data = 0x01,
+    .ei_version = 0x01,
+    .type = 0x01,
+    .machine = 0x3e,
+    .version = 0x01,
+    .ehsize = 0x40,
+    .shentsize = 0x40,
 };
 
 void asm_mov(Operand a, Operand b) {
