@@ -42,3 +42,15 @@ typedef struct {
     uint64_t addralign;
     uint64_t entsize;
 } ElfSectionHeader;
+
+/**
+ * @see https://refspecs.linuxbase.org/elf/gabi4+/ch4.symtab.html
+ */
+typedef struct {
+    uint32_t name;
+    uint8_t info;
+    uint8_t other;
+    uint16_t shndx;
+    uint64_t value;
+    uint64_t size;
+} ElfSymbolEntry;

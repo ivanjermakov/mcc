@@ -176,11 +176,11 @@ Param visit_param() {
 
 // func_decl = type IDENT "(" param ("," param)* ")" (";" | block)
 bool visit_func_decl() {
+    size_t symbol_pos = text_size;
     Ident type_ret = visit_ident();
+    if (!type_ret.ok) return type_ret.ok;
     Ident name = visit_ident();
-    (void)type_ret;
-    (void)name;
-    asm_push(RBP);
+    if (!name.ok) return name.ok;
 
     token_pos++;
     while (token_buf[token_pos].type != C_PAREN) {
@@ -190,17 +190,22 @@ bool visit_func_decl() {
     }
     token_pos++;
     if (token_buf[token_pos].type == SEMI) {
+        add_symbol(*name.span, symbol_pos, false);
         token_pos++;
     } else if (token_buf[token_pos].type == O_BRACE) {
+        add_symbol(*name.span, symbol_pos, true);
+        asm_push(RBP);
+
         bool ok = visit_block();
         if (!ok) return ok;
+
+        asm_pop(RBP);
     } else {
         fprintf(stderr, "unexpected token when parsing func_decl at %zu: %s\n",
                 token_buf[token_pos].span.start, token_name[token_buf[token_pos].type]);
         return false;
     }
 
-    asm_pop(RBP);
     return true;
 }
 

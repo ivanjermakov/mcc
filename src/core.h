@@ -50,7 +50,13 @@ size_t input_size = 0;
 
 size_t token_pos = 0;
 
-uint8_t section_text_buf[1 << 10];
+uint8_t text_buf[1 << 10];
 size_t text_size = 0;
-uint8_t section_rodata_buf[1 << 10];
+uint8_t rodata_buf[1 << 10];
 size_t rodata_size = 0;
+uint8_t symbol_names_buf[1 << 10];
+size_t symbol_names_size = 1;
+ElfSymbolEntry symbols_local_buf[1 << 10];
+size_t symbols_local_size = 1;
+ElfSymbolEntry symbols_global_buf[1 << 10];
+size_t symbols_global_size = 0;

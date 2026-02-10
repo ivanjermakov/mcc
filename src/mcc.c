@@ -35,25 +35,37 @@ int32_t main(int32_t argc, char* argv[]) {
     size_t sections_size = 0;
 
     uint64_t section_text_offset = sizeof elf_header + sections_size;
-    memcpy(&sections_buf[sections_size], &section_text_buf, text_size);
+    memcpy(&sections_buf[sections_size], &text_buf, text_size);
     sections_size += text_size;
 
     uint64_t section_rodata_offset = sizeof elf_header + sections_size;
-    memcpy(&sections_buf[sections_size], &section_rodata_buf, rodata_size);
-    sections_size += rodata_size;
+    memcpy(&sections_buf[sections_size], &rodata_buf, sizeof(ElfSymbolEntry) * symbols_local_size);
+    sections_size += sizeof(ElfSymbolEntry) * symbols_local_size;
 
     uint64_t section_shstrtab_offset = sizeof elf_header + sections_size;
-    char* section_names[3] = {".text", ".rodata", ".shstrtab"};
-    uint32_t section_shstrtab_offsets[3] = {0};
-    uint8_t section_shstrtab_buf[1 << 10] = {0};
+    char* section_names[6] = {".null", ".text", ".rodata", ".shstrtab", ".strtab", ".symtab"};
+    uint32_t shstrtab_offsets[6] = {0};
+    uint8_t shstrtab_buf[1 << 10] = {0};
     size_t shstrtab_size = 0;
     for (size_t i = 0; i < sizeof section_names / sizeof section_names[0]; i++) {
-        section_shstrtab_offsets[i] = shstrtab_size;
-        memcpy(&section_shstrtab_buf[shstrtab_size], section_names[i], strlen(section_names[i]));
+        shstrtab_offsets[i] = shstrtab_size;
+        memcpy(&shstrtab_buf[shstrtab_size], section_names[i], strlen(section_names[i]));
         shstrtab_size += strlen(section_names[i]) + 1;
     }
-    memcpy(&sections_buf[sections_size], &section_shstrtab_buf, shstrtab_size);
+    memcpy(&sections_buf[sections_size], &shstrtab_buf, shstrtab_size);
     sections_size += shstrtab_size;
+
+    uint64_t section_strtab_offset = sizeof elf_header + sections_size;
+    memcpy(&sections_buf[sections_size], &symbol_names_buf, symbol_names_size);
+    sections_size += symbol_names_size;
+
+    uint64_t section_symtab_offset = sizeof elf_header + sections_size;
+    memcpy(&sections_buf[sections_size], &symbols_local_buf,
+           sizeof(ElfSymbolEntry) * symbols_local_size);
+    sections_size += sizeof(ElfSymbolEntry) * symbols_local_size;
+    memcpy(&sections_buf[sections_size], &symbols_global_buf,
+           sizeof(ElfSymbolEntry) * symbols_global_size);
+    sections_size += sizeof(ElfSymbolEntry) * symbols_global_size;
 
     uint64_t section_header_table_offset = sizeof elf_header + sections_size;
     ElfSectionHeader null = {0};
@@ -61,7 +73,7 @@ int32_t main(int32_t argc, char* argv[]) {
     sections_size += sizeof null;
 
     ElfSectionHeader text = {
-        .name = section_shstrtab_offsets[0],
+        .name = shstrtab_offsets[1],
         .type = 1,
         .flags = 0x02 | 0x04,
         .addr = section_text_offset,
@@ -72,7 +84,7 @@ int32_t main(int32_t argc, char* argv[]) {
     sections_size += sizeof text;
 
     ElfSectionHeader rodata = {
-        .name = section_shstrtab_offsets[1],
+        .name = shstrtab_offsets[2],
         .type = 1,
         .flags = 0x02,
         .addr = section_rodata_offset,
@@ -83,7 +95,7 @@ int32_t main(int32_t argc, char* argv[]) {
     sections_size += sizeof rodata;
 
     ElfSectionHeader shstrtab = {
-        .name = section_shstrtab_offsets[2],
+        .name = shstrtab_offsets[3],
         .type = 3,
         .addr = section_shstrtab_offset,
         .offset = section_shstrtab_offset,
@@ -92,8 +104,31 @@ int32_t main(int32_t argc, char* argv[]) {
     memcpy(&sections_buf[sections_size], &shstrtab, sizeof shstrtab);
     sections_size += sizeof shstrtab;
 
+    ElfSectionHeader strtab = {
+        .name = shstrtab_offsets[4],
+        .type = 3,
+        .addr = section_strtab_offset,
+        .offset = section_strtab_offset,
+        .size = symbol_names_size,
+    };
+    memcpy(&sections_buf[sections_size], &strtab, sizeof strtab);
+    sections_size += sizeof strtab;
+
+    ElfSectionHeader symtab = {
+        .name = shstrtab_offsets[5],
+        .type = 2,
+        .addr = section_symtab_offset,
+        .offset = section_symtab_offset,
+        .size = sizeof(ElfSymbolEntry) * (symbols_local_size + symbols_global_size),
+        .link = 4,                  // index of .strtab section
+        .info = symbols_local_size, // index of the first non-local symbol
+        .entsize = sizeof(ElfSymbolEntry),
+    };
+    memcpy(&sections_buf[sections_size], &symtab, sizeof symtab);
+    sections_size += sizeof symtab;
+
     elf_header.shoff = section_header_table_offset;
-    elf_header.shnum = 4;
+    elf_header.shnum = 6;
     elf_header.shstrndx = 3;
 
     char* out_path = argv[2];
