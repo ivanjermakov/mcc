@@ -56,40 +56,42 @@ int32_t main(int32_t argc, char* argv[]) {
     sections_size += shstrtab_size;
 
     uint64_t section_header_table_offset = sizeof elf_header + sections_size;
-    uint8_t section_null[0x40] = {0};
-    memcpy(&sections_buf[sections_size], &section_null, sizeof section_null);
-    sections_size += sizeof section_null;
+    ElfSectionHeader null = {0};
+    memcpy(&sections_buf[sections_size], &null, sizeof null);
+    sections_size += sizeof null;
 
-    uint8_t section_text[0x40] = {0};
-    memcpy(&section_text[0x00], &section_shstrtab_offsets[0], 4);
-    section_text[0x04] = 1;
-    section_text[0x08] = 0x02 | 0x04;
-    memcpy(&section_text[0x10], &section_text_offset, 8);
-    memcpy(&section_text[0x18], &section_text_offset, 8);
-    memcpy(&section_text[0x20], &text_size, 8);
-    memcpy(&sections_buf[sections_size], &section_text, sizeof section_text);
-    sections_size += sizeof section_text;
+    ElfSectionHeader text = {
+        .name = section_shstrtab_offsets[0],
+        .type = 1,
+        .flags = 0x02 | 0x04,
+        .addr = section_text_offset,
+        .offset = section_text_offset,
+        .size = text_size
+    };
+    memcpy(&sections_buf[sections_size], &text, sizeof text);
+    sections_size += sizeof text;
 
-    uint8_t section_rodata[0x40] = {0};
-    memcpy(&section_rodata[0x00], &section_shstrtab_offsets[1], 4);
-    section_rodata[0x04] = 1;
-    section_rodata[0x08] = 0x02;
-    memcpy(&section_rodata[0x10], &section_rodata_offset, 8);
-    memcpy(&section_rodata[0x18], &section_rodata_offset, 8);
-    memcpy(&section_rodata[0x20], &rodata_size, 8);
-    memcpy(&sections_buf[sections_size], &section_rodata, sizeof section_rodata);
-    sections_size += sizeof section_rodata;
+    ElfSectionHeader rodata = {
+        .name = section_shstrtab_offsets[1],
+        .type = 1,
+        .flags = 0x02,
+        .addr = section_rodata_offset,
+        .offset = section_rodata_offset,
+        .size = rodata_size
+    };
+    memcpy(&sections_buf[sections_size], &rodata, sizeof rodata);
+    sections_size += sizeof rodata;
 
-    uint8_t section_shstrtab[0x40] = {0};
-    memcpy(&section_shstrtab[0x00], &section_shstrtab_offsets[2], 4);
-    section_shstrtab[0x04] = 3;
-    memcpy(&section_shstrtab[0x10], &section_shstrtab_offset, 8);
-    memcpy(&section_shstrtab[0x18], &section_shstrtab_offset, 8);
-    memcpy(&section_shstrtab[0x20], &shstrtab_size, 8);
-    memcpy(&sections_buf[sections_size], &section_shstrtab, sizeof section_shstrtab);
-    sections_size += sizeof section_shstrtab;
+    ElfSectionHeader shstrtab = {
+        .name = section_shstrtab_offsets[2],
+        .type = 3,
+        .addr = section_shstrtab_offset,
+        .offset = section_shstrtab_offset,
+        .size = shstrtab_size
+    };
+    memcpy(&sections_buf[sections_size], &shstrtab, sizeof shstrtab);
+    sections_size += sizeof shstrtab;
 
-    // TODO: complete ELF
     elf_header.shoff = section_header_table_offset;
     elf_header.shnum = 4;
     elf_header.shstrndx = 3;

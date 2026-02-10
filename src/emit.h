@@ -76,6 +76,22 @@ ElfHeader elf_header = {
     .shentsize = 0x40,
 };
 
+/**
+ * @see https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#Section_header
+ */
+typedef struct {
+    uint32_t name;
+    uint32_t type;
+    uint64_t flags;
+    uint64_t addr;
+    uint64_t offset;
+    uint64_t size;
+    uint32_t link;
+    uint32_t info;
+    uint64_t addralign;
+    uint64_t entsize;
+} ElfSectionHeader;
+
 void asm_mov(Operand a, Operand b) {
     fprintf(stderr, "TODO asm_mov\n");
     section_text_buf[text_size++] = 0x90;
