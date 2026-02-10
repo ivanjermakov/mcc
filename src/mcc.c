@@ -66,7 +66,7 @@ int32_t main(int32_t argc, char* argv[]) {
         .flags = 0x02 | 0x04,
         .addr = section_text_offset,
         .offset = section_text_offset,
-        .size = text_size
+        .size = text_size,
     };
     memcpy(&sections_buf[sections_size], &text, sizeof text);
     sections_size += sizeof text;
@@ -77,7 +77,7 @@ int32_t main(int32_t argc, char* argv[]) {
         .flags = 0x02,
         .addr = section_rodata_offset,
         .offset = section_rodata_offset,
-        .size = rodata_size
+        .size = rodata_size,
     };
     memcpy(&sections_buf[sections_size], &rodata, sizeof rodata);
     sections_size += sizeof rodata;
@@ -87,7 +87,7 @@ int32_t main(int32_t argc, char* argv[]) {
         .type = 3,
         .addr = section_shstrtab_offset,
         .offset = section_shstrtab_offset,
-        .size = shstrtab_size
+        .size = shstrtab_size,
     };
     memcpy(&sections_buf[sections_size], &shstrtab, sizeof shstrtab);
     sections_size += sizeof shstrtab;

@@ -38,32 +38,6 @@ const Operand RBP = {.tag = REGISTER, .o = {.reg = {.i = 5, .size = 64}}};
 const Operand RSI = {.tag = REGISTER, .o = {.reg = {.i = 6, .size = 64}}};
 const Operand RDI = {.tag = REGISTER, .o = {.reg = {.i = 7, .size = 64}}};
 
-/**
- * @see https://refspecs.linuxfoundation.org/elf/gabi4+/ch4.eheader.html
- * @see https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ELF_header
- */
-typedef struct {
-    uint8_t ei_magic[4];
-    uint8_t ei_class;
-    uint8_t ei_data;
-    uint8_t ei_version;
-    uint8_t abi;
-    uint8_t pad[7];
-    uint16_t type;
-    uint16_t machine;
-    uint32_t version;
-    uint64_t entry;
-    uint64_t phoff;
-    uint64_t shoff;
-    uint32_t flags;
-    uint16_t ehsize;
-    uint16_t phentsize;
-    uint16_t phnum;
-    uint16_t shentsize;
-    uint16_t shnum;
-    uint16_t shstrndx;
-} ElfHeader;
-
 ElfHeader elf_header = {
     .ei_magic = {0x7F, 0x45, 0x4C, 0x46},
     .ei_class = 0x02,
@@ -75,22 +49,6 @@ ElfHeader elf_header = {
     .ehsize = 0x40,
     .shentsize = 0x40,
 };
-
-/**
- * @see https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#Section_header
- */
-typedef struct {
-    uint32_t name;
-    uint32_t type;
-    uint64_t flags;
-    uint64_t addr;
-    uint64_t offset;
-    uint64_t size;
-    uint32_t link;
-    uint32_t info;
-    uint64_t addralign;
-    uint64_t entsize;
-} ElfSectionHeader;
 
 void asm_mov(Operand a, Operand b) {
     fprintf(stderr, "TODO asm_mov\n");
