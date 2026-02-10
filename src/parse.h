@@ -1,5 +1,6 @@
 #pragma once
 #include "core.h"
+#include "emit.h"
 
 typedef struct {
     bool ok;
@@ -179,6 +180,7 @@ bool visit_func_decl() {
     Ident name = visit_ident();
     (void)type_ret;
     (void)name;
+    asm_push(RBP);
 
     token_pos++;
     while (token_buf[token_pos].type != C_PAREN) {
@@ -197,6 +199,8 @@ bool visit_func_decl() {
                 token_buf[token_pos].span.start, token_name[token_buf[token_pos].type]);
         return false;
     }
+
+    asm_pop(RBP);
     return true;
 }
 
