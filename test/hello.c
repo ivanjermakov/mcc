@@ -1,6 +1,6 @@
-#include "stdio.h"
+void puts(char* s);
 
-int main(int argc, char* argv[]) {
-    printf("hello, world!\n");
+int main() {
+    puts("hello, world!");
     return 0;
 }

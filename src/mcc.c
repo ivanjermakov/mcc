@@ -3,12 +3,12 @@
 #include "stdio.h"
 #include "string.h"
 
-struct Span {
+typedef struct {
     size_t start;
     size_t len;
-};
+} Span;
 
-enum TokenType {
+typedef enum {
     NONE = 0,
     IDENT,
     INT,
@@ -21,7 +21,7 @@ enum TokenType {
     C_PAREN,
     COMMA,
     ASTERISK,
-};
+} TokenType;
 char* token_literal[] = {
     0, 0, 0, 0, "#", ";", "{", "}", "(", ")", ",", "*",
 };
@@ -31,15 +31,15 @@ char* token_name[] = {
     "O_BRACE", "C_BRACE", "O_PAREN", "C_PAREN", "COMMA", "ASTERISK",
 };
 
-struct Token {
-    struct Span span;
-    enum TokenType type;
-};
+typedef struct {
+    Span span;
+    TokenType type;
+} Token;
 
 char input_buf[1 << 10];
 size_t input_size = 0;
 
-struct Token token_buf[1 << 10];
+Token token_buf[1 << 10];
 size_t token_size = 0;
 size_t token_offset = 0;
 
@@ -59,8 +59,8 @@ bool is_ident(char c, size_t len) {
     return is_alpha(c) || c == '_' || (len > 0 && is_digit(c));
 }
 
-struct Token next_token() {
-    struct Token token = {0};
+Token next_token() {
+    Token token = {0};
     while (token_offset < input_size &&
            (!is_printable(input_buf[token_offset]) || input_buf[token_offset] == ' ')) {
         token_offset++;
@@ -123,17 +123,21 @@ struct Token next_token() {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "missing file argument");
+        fprintf(stderr, "missing file argument\n");
         return 1;
     }
     char* source_path = argv[1];
     FILE* source_file = fopen(source_path, "r");
     input_size = fread(&input_buf, 1, sizeof input_buf, source_file);
 
-    struct Token token;
+    Token token;
     while (true) {
         token = next_token();
         if (token.type == NONE) break;
+        token_buf[token_size++] = token;
+    }
+    for (size_t i = 0; i < token_size; i++) {
+        Token token = token_buf[i];
         printf("%-10s'", token_name[token.type]);
         fwrite(&input_buf[token.span.start], 1, token.span.len, stdout);
         printf("'\n");
