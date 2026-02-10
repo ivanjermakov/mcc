@@ -1,19 +1,18 @@
-program     = (var_decl | func_decl)+
-var_decl    = IDENT IDENT ";"
-func_decl   = IDENT IDENT "(" param ("," param)* ")" "{" statement* "}"
-param       = IDENT IDENT
-block       = "{" statement* "}"
-statement   = if
-            | while
-            | call
-if          = "if" "(" expr ")" block ";"
-while       = "while" "(" expr ")" block ";"
-call        = IDENT "(" expr ("," expr)* ")" ";"
-expr        = unary (op unary)?
-unary       = IDENT
-            | INT
-            | STRING
-            | "&" IDENT
-            | "(" expr ")"
-op          = "+" | "-" | "&" | "|" | "^" | "<<" | ">>"
-            | "==" | "!=" | "<" | ">" | "<=" | ">="
+program   = (var_decl | func_decl)+
+var_decl  = type IDENT ";"
+func_decl = type IDENT "(" param ("," param)* ")" (";" | block)
+param     = type IDENT
+type      = IDENT "*"?
+block     = "{" statement* "}"
+statement = if | call | return
+if        = "if" "(" expr ")" block ";"
+call      = IDENT "(" expr ("," expr)* ")" ";"
+return    = "return" expr ";"
+expr      = unary (op unary)?
+unary     = IDENT
+          | INT
+          | STRING
+          | "&" IDENT
+          | "(" expr ")"
+op        = "+" | "-" | "&" | "|" | "^" | "<<" | ">>"
+          | "==" | "!=" | "<" | ">" | "<=" | ">="
