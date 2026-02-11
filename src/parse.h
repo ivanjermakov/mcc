@@ -195,11 +195,13 @@ bool visit_func_decl() {
     } else if (token_buf[token_pos].type == O_BRACE) {
         add_symbol(*name.span, symbol_pos, true);
         asm_push(RBP);
+        asm_mov(RBP, RSP);
 
         bool ok = visit_block();
         if (!ok) return ok;
 
         asm_pop(RBP);
+        asm_ret();
     } else {
         fprintf(stderr, "unexpected token when parsing func_decl at %zu: %s\n",
                 token_buf[token_pos].span.start, token_name[token_buf[token_pos].type]);

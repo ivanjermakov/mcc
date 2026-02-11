@@ -51,6 +51,12 @@ ElfHeader elf_header = {
 };
 
 void asm_mov(Operand a, Operand b) {
+    if (a.tag == REGISTER && b.tag == REGISTER) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x89;
+        text_buf[text_size++] = (3 << 6) | (b.o.reg.i << 3) | (a.o.reg.i);
+        return;
+    }
     fprintf(stderr, "TODO asm_mov\n");
     text_buf[text_size++] = 0x90;
 }
@@ -71,6 +77,10 @@ void asm_pop(Operand a) {
     }
     fprintf(stderr, "TODO asm_pop\n");
     text_buf[text_size++] = 0x90;
+}
+
+void asm_ret() {
+    text_buf[text_size++] = 0xC3;
 }
 
 void add_symbol(Span name, size_t pos, bool impl) {
