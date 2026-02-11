@@ -176,3 +176,122 @@ void asm_call(size_t symbol_index) {
     relocation_add(PLT32, symbol_index, text_size);
     text_size += 4;
 }
+
+void write_elf(FILE* out_file) {
+    uint8_t sections_buf[1 << 10] = {0};
+    size_t sections_size = 0;
+
+    uint64_t section_text_offset = sizeof elf_header + sections_size;
+    memcpy(&sections_buf[sections_size], &text_buf, text_size);
+    sections_size += text_size;
+
+    uint64_t section_rodata_offset = sizeof elf_header + sections_size;
+    memcpy(&sections_buf[sections_size], &rodata_buf, rodata_size);
+    sections_size += rodata_size;
+
+    uint64_t section_shstrtab_offset = sizeof elf_header + sections_size;
+    char* section_names[7] = {".null",   ".text",   ".rodata",  ".shstrtab",
+                              ".strtab", ".symtab", ".rel.text"};
+    uint32_t shstrtab_offsets[7] = {0};
+    uint8_t shstrtab_buf[1 << 10] = {0};
+    size_t shstrtab_size = 0;
+    for (size_t i = 0; i < sizeof section_names / sizeof section_names[0]; i++) {
+        shstrtab_offsets[i] = shstrtab_size;
+        memcpy(&shstrtab_buf[shstrtab_size], section_names[i], strlen(section_names[i]));
+        shstrtab_size += strlen(section_names[i]) + 1;
+    }
+    memcpy(&sections_buf[sections_size], &shstrtab_buf, shstrtab_size);
+    sections_size += shstrtab_size;
+
+    uint64_t section_strtab_offset = sizeof elf_header + sections_size;
+    memcpy(&sections_buf[sections_size], &symbol_names_buf, symbol_names_size);
+    sections_size += symbol_names_size;
+
+    uint64_t section_symtab_offset = sizeof elf_header + sections_size;
+    memcpy(&sections_buf[sections_size], &symbols_local_buf,
+           sizeof(ElfSymbolEntry) * symbols_local_size);
+    sections_size += sizeof(ElfSymbolEntry) * symbols_local_size;
+    memcpy(&sections_buf[sections_size], &symbols_global_buf,
+           sizeof(ElfSymbolEntry) * symbols_global_size);
+    sections_size += sizeof(ElfSymbolEntry) * symbols_global_size;
+
+    uint64_t section_reltext_offset = sizeof elf_header + sections_size;
+    memcpy(&sections_buf[sections_size], &relocations_buf,
+           sizeof(ElfRelocationEntry) * relocations_size);
+    sections_size += sizeof(ElfRelocationEntry) * relocations_size;
+
+    uint64_t section_header_table_offset = sizeof elf_header + sections_size;
+    ElfSectionHeader null = {0};
+    memcpy(&sections_buf[sections_size], &null, sizeof null);
+    sections_size += sizeof null;
+
+    ElfSectionHeader text = {
+        .name = shstrtab_offsets[1],
+        .type = 1,
+        .flags = 0x02 | 0x04,
+        .addr = 0,
+        .offset = section_text_offset,
+        .size = text_size,
+    };
+    memcpy(&sections_buf[sections_size], &text, sizeof text);
+    sections_size += sizeof text;
+
+    ElfSectionHeader rodata = {
+        .name = shstrtab_offsets[2],
+        .type = 1,
+        .flags = 0x02 | 0x10 | 0x20,
+        .offset = section_rodata_offset,
+        .size = rodata_size,
+    };
+    memcpy(&sections_buf[sections_size], &rodata, sizeof rodata);
+    sections_size += sizeof rodata;
+
+    ElfSectionHeader shstrtab = {
+        .name = shstrtab_offsets[3],
+        .type = 3,
+        .offset = section_shstrtab_offset,
+        .size = shstrtab_size,
+    };
+    memcpy(&sections_buf[sections_size], &shstrtab, sizeof shstrtab);
+    sections_size += sizeof shstrtab;
+
+    ElfSectionHeader strtab = {
+        .name = shstrtab_offsets[4],
+        .type = 3,
+        .offset = section_strtab_offset,
+        .size = symbol_names_size,
+    };
+    memcpy(&sections_buf[sections_size], &strtab, sizeof strtab);
+    sections_size += sizeof strtab;
+
+    ElfSectionHeader symtab = {
+        .name = shstrtab_offsets[5],
+        .type = 2,
+        .offset = section_symtab_offset,
+        .size = sizeof(ElfSymbolEntry) * (symbols_local_size + symbols_global_size),
+        .link = 4,                  // index of .strtab section
+        .info = symbols_local_size, // index of the first non-local symbol
+        .entsize = sizeof(ElfSymbolEntry),
+    };
+    memcpy(&sections_buf[sections_size], &symtab, sizeof symtab);
+    sections_size += sizeof symtab;
+
+    ElfSectionHeader reltext = {
+        .name = shstrtab_offsets[6],
+        .type = 4,
+        .offset = section_reltext_offset,
+        .size = sizeof(ElfRelocationEntry) * relocations_size,
+        .link = 5, // index of a .symtab section
+        .info = 1, // index of a .rel.text section
+        .entsize = sizeof(ElfRelocationEntry),
+    };
+    memcpy(&sections_buf[sections_size], &reltext, sizeof reltext);
+    sections_size += sizeof reltext;
+
+    elf_header.shoff = section_header_table_offset;
+    elf_header.shnum = 7;
+    elf_header.shstrndx = 3;
+
+    fwrite(&elf_header, 1, sizeof elf_header, out_file);
+    fwrite(sections_buf, 1, sections_size, out_file);
+}
