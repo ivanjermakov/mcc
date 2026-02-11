@@ -23,10 +23,24 @@ Int visit_int() {
 typedef struct {
     bool ok;
     Span* span;
+    Operand operand;
 } String;
 String visit_string() {
     String string = {.ok = true, .span = &token_buf[token_pos].span};
     token_pos++;
+
+    // TODO: escape sequences
+    char symbol_name_buf[16] = {0};
+    sprintf(symbol_name_buf, ".str%zu", symbols_local_size);
+    size_t string_size = string.span->len - 2;
+    size_t symbol_idx = symbol_add_local(symbol_name_buf, rodata_size, string_size);
+    string.operand = (Operand){
+        .tag = MEMORY,
+        .o = {.memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx}},
+    };
+    memcpy(&rodata_buf[rodata_size], &input_buf[string.span->start + 1], string_size);
+    rodata_size += string_size;
+
     return string;
 }
 
@@ -79,6 +93,7 @@ Expr visit_unary() {
     } else if (token_buf[token_pos].type == STRING) {
         String string = visit_string();
         if (!string.ok) return expr;
+        expr.operand = string.operand;
     } else if (token_buf[token_pos].type == AMPERSAND) {
         fprintf(stderr, "TODO\n");
         return expr;
@@ -121,10 +136,14 @@ bool visit_call() {
     Ident name = visit_ident();
     if (!name.ok) return name.ok;
     token_pos++;
+    size_t arg_idx = 0;
     while (token_buf[token_pos].type != C_PAREN) {
         Expr expr = visit_expr();
         if (!expr.ok) return expr.ok;
         if (token_buf[token_pos].type == SEMI) token_pos++;
+
+        asm_lea(argument_registers[arg_idx], expr.operand);
+        arg_idx++;
     }
     token_pos++;
     token_pos++;

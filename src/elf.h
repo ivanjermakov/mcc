@@ -54,3 +54,13 @@ typedef struct {
     uint64_t value;
     uint64_t size;
 } ElfSymbolEntry;
+
+/**
+ * @see https://refspecs.linuxbase.org/elf/gabi4+/ch4.reloc.html
+ */
+typedef struct {
+    uint64_t offset;
+    uint32_t type;
+    uint32_t sym;
+    int64_t addend;
+} ElfRelocationEntry;

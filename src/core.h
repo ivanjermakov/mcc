@@ -61,3 +61,5 @@ ElfSymbolEntry symbols_local_buf[1 << 10];
 size_t symbols_local_size = 1;
 ElfSymbolEntry symbols_global_buf[1 << 10];
 size_t symbols_global_size = 0;
+ElfRelocationEntry relocations_buf[1 << 10];
+size_t relocations_size = 0;
