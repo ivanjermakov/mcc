@@ -66,13 +66,44 @@ ElfHeader elf_header = {
     .shentsize = 0x40,
 };
 
-void relocation_add(OperandMemory operand, size_t offset) {
+typedef enum {
+    PC32 = 2,
+    PLT32 = 4,
+} ElfRelocationType;
+
+void relocation_add(ElfRelocationType type, size_t symbol_index, size_t offset) {
     relocations_buf[relocations_size++] = (ElfRelocationEntry){
         .offset = offset,
-        .type = 2, // R_X86_64_PC32
-        .sym = operand.offset,
+        .type = type,
+        .sym = symbol_index,
         .addend = -4,
     };
+}
+
+typedef struct {
+    bool impl;
+} AddSymbolOptions;
+
+size_t symbol_add_global(Span name, size_t pos, AddSymbolOptions opts) {
+    memcpy(&symbol_names_buf[symbol_names_size], &input_buf[name.start], name.len);
+    size_t idx = symbols_global_size;
+    symbols_global_buf[symbols_global_size++] = (ElfSymbolEntry){
+        .name = (uint32_t)symbol_names_size,
+        .info = (uint8_t)((1 << 4) + (opts.impl ? 2 : 0)),
+        .shndx = (uint16_t)(opts.impl ? 1 : 0),
+        .value = pos,
+    };
+    symbol_names_size += name.len + 1;
+    return idx;
+}
+
+size_t symbol_add_local(char* name, size_t pos, size_t size) {
+    memcpy(&symbol_names_buf[symbol_names_size], name, strlen(name));
+    size_t idx = symbols_local_size;
+    symbols_local_buf[symbols_local_size++] = (ElfSymbolEntry){
+        .name = (uint32_t)symbol_names_size, .info = 1, .shndx = 2, .value = pos, .size = size};
+    symbol_names_size += strlen(name) + 1;
+    return idx;
 }
 
 void asm_nop() {
@@ -97,7 +128,7 @@ void asm_mov(Operand a, Operand b) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8B;
         text_buf[text_size++] = (uint8_t)((0 << 6) | (a.o.reg.i << 3) | 5);
-        relocation_add(b.o.memory, text_size);
+        relocation_add(PC32, b.o.memory.offset, text_size);
         text_size += 4;
         return;
     }
@@ -110,7 +141,7 @@ void asm_lea(Operand a, Operand b) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8D;
         text_buf[text_size++] = (uint8_t)((0 << 6) | (a.o.reg.i << 3) | 5);
-        relocation_add(b.o.memory, text_size);
+        relocation_add(PC32, b.o.memory.offset, text_size);
         text_size += 4;
         return;
     }
@@ -140,28 +171,8 @@ void asm_ret() {
     text_buf[text_size++] = 0xC3;
 }
 
-typedef struct {
-    bool impl;
-} AddSymbolOptions;
-
-size_t symbol_add_global(Span name, size_t pos, AddSymbolOptions opts) {
-    memcpy(&symbol_names_buf[symbol_names_size], &input_buf[name.start], name.len);
-    size_t idx = symbols_global_size;
-    symbols_global_buf[symbols_global_size++] = (ElfSymbolEntry){
-        .name = (uint32_t)symbol_names_size,
-        .info = (uint8_t)((1 << 4) + (opts.impl ? 2 : 0)),
-        .shndx = (uint16_t)(opts.impl ? 1 : 0),
-        .value = pos,
-    };
-    symbol_names_size += name.len + 1;
-    return idx;
-}
-
-size_t symbol_add_local(char* name, size_t pos, size_t size) {
-    memcpy(&symbol_names_buf[symbol_names_size], name, strlen(name));
-    size_t idx = symbols_local_size;
-    symbols_local_buf[symbols_local_size++] = (ElfSymbolEntry){
-        .name = (uint32_t)symbol_names_size, .info = 1, .shndx = 2, .value = pos, .size = size};
-    symbol_names_size += strlen(name) + 1;
-    return idx;
+void asm_call(size_t symbol_index) {
+    text_buf[text_size++] = 0xE8;
+    relocation_add(PLT32, symbol_index, text_size);
+    text_size += 4;
 }

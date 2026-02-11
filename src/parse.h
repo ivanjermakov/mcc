@@ -148,6 +148,10 @@ bool visit_call() {
     token_pos++;
     token_pos++;
 
+    // TODO: find symbol index
+    size_t symbol_idx = 2;
+    asm_call(symbol_idx);
+
     return true;
 }
 

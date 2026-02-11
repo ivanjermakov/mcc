@@ -82,7 +82,7 @@ int32_t main(int32_t argc, char* argv[]) {
         .name = shstrtab_offsets[1],
         .type = 1,
         .flags = 0x02 | 0x04,
-        .addr = section_text_offset,
+        .addr = 0,
         .offset = section_text_offset,
         .size = text_size,
     };
@@ -93,7 +93,6 @@ int32_t main(int32_t argc, char* argv[]) {
         .name = shstrtab_offsets[2],
         .type = 1,
         .flags = 0x02 | 0x10 | 0x20,
-        .addr = section_rodata_offset,
         .offset = section_rodata_offset,
         .size = rodata_size,
     };
@@ -103,7 +102,6 @@ int32_t main(int32_t argc, char* argv[]) {
     ElfSectionHeader shstrtab = {
         .name = shstrtab_offsets[3],
         .type = 3,
-        .addr = section_shstrtab_offset,
         .offset = section_shstrtab_offset,
         .size = shstrtab_size,
     };
@@ -113,7 +111,6 @@ int32_t main(int32_t argc, char* argv[]) {
     ElfSectionHeader strtab = {
         .name = shstrtab_offsets[4],
         .type = 3,
-        .addr = section_strtab_offset,
         .offset = section_strtab_offset,
         .size = symbol_names_size,
     };
@@ -123,7 +120,6 @@ int32_t main(int32_t argc, char* argv[]) {
     ElfSectionHeader symtab = {
         .name = shstrtab_offsets[5],
         .type = 2,
-        .addr = section_symtab_offset,
         .offset = section_symtab_offset,
         .size = sizeof(ElfSymbolEntry) * (symbols_local_size + symbols_global_size),
         .link = 4,                  // index of .strtab section
@@ -136,7 +132,6 @@ int32_t main(int32_t argc, char* argv[]) {
     ElfSectionHeader reltext = {
         .name = shstrtab_offsets[6],
         .type = 4,
-        .addr = section_reltext_offset,
         .offset = section_reltext_offset,
         .size = sizeof(ElfRelocationEntry) * relocations_size,
         .link = 5, // index of a .symtab section
