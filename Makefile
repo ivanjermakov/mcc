@@ -1,7 +1,7 @@
 .PHONY: build
 
 build:
-	clang src/mcc.c -Wall -Wextra -g -o build/mcc
+	clang src/mcc.c -std=c99 -Wall -Wextra -g -o build/mcc
 
 compile_hello: build
 	build/mcc test/hello.c build/hello.o && objdump -xsd -M intel build/hello.o

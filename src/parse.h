@@ -4,10 +4,18 @@
 
 typedef struct {
     bool ok;
+    Operand operand;
+} Expr;
+
+typedef struct {
+    bool ok;
     Span* span;
+    int64_t value;
 } Int;
 Int visit_int() {
-    Int i = {.ok = true, .span = &token_buf[token_pos].span};
+    Span* span = &token_buf[token_pos].span;
+    int64_t value = strtol(&input_buf[span->start], 0, 10);
+    Int i = {.ok = true, .span = span, .value = value};
     token_pos++;
     return i;
 }
@@ -59,40 +67,47 @@ bool visit_op() {
 }
 
 // unary = IDENT | INT | STRING | "&" IDENT | "(" expr ")"
-bool visit_unary() {
+Expr visit_unary() {
+    Expr expr = {};
     if (token_buf[token_pos].type == IDENT) {
         fprintf(stderr, "TODO\n");
-        return false;
+        return expr;
     } else if (token_buf[token_pos].type == INT) {
         Int i = visit_int();
-        if (!i.ok) return i.ok;
+        if (!i.ok) return expr;
+        expr.operand = (Operand){.tag = IMMEDIATE, .o = {.immediate = {.value = i.value}}};
     } else if (token_buf[token_pos].type == STRING) {
         String string = visit_string();
-        if (!string.ok) return string.ok;
+        if (!string.ok) return expr;
     } else if (token_buf[token_pos].type == AMPERSAND) {
         fprintf(stderr, "TODO\n");
-        return false;
+        return expr;
     } else if (token_buf[token_pos].type == O_PAREN) {
         fprintf(stderr, "TODO\n");
-        return false;
+        return expr;
     } else {
         fprintf(stderr, "TODO\n");
-        return false;
+        return expr;
     }
-    return true;
+    expr.ok = true;
+    return expr;
 }
 
 // expr = unary (op unary)?
-bool visit_expr() {
-    bool ok = visit_unary();
-    if (!ok) return ok;
+Expr visit_expr() {
+    Expr expr = {};
+    Expr unary = visit_unary();
+    if (!unary.ok) return expr;
     while (token_buf[token_pos].type >= OP_PLUS && token_buf[token_pos].type <= OP_PLUS) {
-        ok = visit_op();
-        if (!ok) return ok;
-        ok = visit_unary();
-        if (!ok) return ok;
+        bool ok = visit_op();
+        if (!ok) return expr;
+        unary = visit_unary();
+        if (!unary.ok) return expr;
     }
-    return true;
+    expr.ok = true;
+    // TODO: precedence parsing
+    expr.operand = unary.operand;
+    return expr;
 }
 
 // if = "if" "(" expr ")" block ";"
@@ -107,8 +122,8 @@ bool visit_call() {
     if (!name.ok) return name.ok;
     token_pos++;
     while (token_buf[token_pos].type != C_PAREN) {
-        bool ok = visit_expr();
-        if (!ok) return ok;
+        Expr expr = visit_expr();
+        if (!expr.ok) return expr.ok;
         if (token_buf[token_pos].type == SEMI) token_pos++;
     }
     token_pos++;
@@ -120,8 +135,9 @@ bool visit_call() {
 // return = "return" expr ";"
 bool visit_return() {
     token_pos++;
-    bool ok = visit_expr();
-    if (!ok) return ok;
+    Expr expr = visit_expr();
+    if (!expr.ok) return expr.ok;
+    asm_mov(RAX, expr.operand);
     token_pos++;
     return true;
 }
@@ -190,10 +206,10 @@ bool visit_func_decl() {
     }
     token_pos++;
     if (token_buf[token_pos].type == SEMI) {
-        add_symbol(*name.span, symbol_pos, false);
+        symbol_add_global(*name.span, symbol_pos, (AddSymbolOptions){.impl = false});
         token_pos++;
     } else if (token_buf[token_pos].type == O_BRACE) {
-        add_symbol(*name.span, symbol_pos, true);
+        symbol_add_global(*name.span, symbol_pos, (AddSymbolOptions){.impl = true});
         asm_push(RBP);
         asm_mov(RBP, RSP);
 

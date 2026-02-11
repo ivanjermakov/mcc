@@ -44,11 +44,15 @@ ElfHeader elf_header = {
     .ei_data = 0x01,
     .ei_version = 0x01,
     .type = 0x01,
-    .machine = 0x3e,
+    .machine = 0x3E,
     .version = 0x01,
     .ehsize = 0x40,
     .shentsize = 0x40,
 };
+
+void asm_nop() {
+    text_buf[text_size++] = 0x90;
+}
 
 void asm_mov(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
@@ -57,8 +61,20 @@ void asm_mov(Operand a, Operand b) {
         text_buf[text_size++] = (3 << 6) | (b.o.reg.i << 3) | (a.o.reg.i);
         return;
     }
+    if (a.tag == REGISTER && b.tag == IMMEDIATE) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0xB8 + a.o.reg.i;
+        memcpy(&text_buf[text_size], &b.o.immediate.value, 8);
+        text_size += 8;
+        return;
+    }
     fprintf(stderr, "TODO asm_mov\n");
-    text_buf[text_size++] = 0x90;
+    asm_nop();
+}
+
+void asm_lea(Operand a, Operand b) {
+    fprintf(stderr, "TODO asm_lea\n");
+    asm_nop();
 }
 
 void asm_push(Operand a) {
@@ -67,7 +83,7 @@ void asm_push(Operand a) {
         return;
     }
     fprintf(stderr, "TODO asm_push\n");
-    text_buf[text_size++] = 0x90;
+    asm_nop();
 }
 
 void asm_pop(Operand a) {
@@ -76,20 +92,25 @@ void asm_pop(Operand a) {
         return;
     }
     fprintf(stderr, "TODO asm_pop\n");
-    text_buf[text_size++] = 0x90;
+    asm_nop();
 }
 
 void asm_ret() {
     text_buf[text_size++] = 0xC3;
 }
 
-void add_symbol(Span name, size_t pos, bool impl) {
+typedef struct {
+    bool impl;
+} AddSymbolOptions;
+size_t symbol_add_global(Span name, size_t pos, AddSymbolOptions opts) {
     memcpy(&symbol_names_buf[symbol_names_size], &input_buf[name.start], name.len);
+    size_t idx = symbols_global_size;
     symbols_global_buf[symbols_global_size++] = (ElfSymbolEntry){
         .name = (uint32_t)symbol_names_size,
-        .info = (uint8_t)((1 << 4) + (impl ? 2 : 0)),
-        .shndx = (uint16_t)(impl ? 1 : 0),
+        .info = (uint8_t)((1 << 4) + (opts.impl ? 2 : 0)),
+        .shndx = (uint16_t)(opts.impl ? 1 : 0),
         .value = pos,
     };
     symbol_names_size += name.len + 1;
+    return idx;
 }
