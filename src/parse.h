@@ -59,27 +59,45 @@ Int visit_int() {
     return i;
 }
 
+// string = "\"" (STRING_PART | ESCAPE_SEQ)+ "\""
 typedef struct {
     bool ok;
-    Span* span;
     Operand operand;
 } String;
 String visit_string() {
-    String string = {.ok = true, .span = &token_buf[token_pos].span};
+    String string = {};
+
+    token_pos++;
+    size_t str_buf[1 << 10];
+    size_t str_len = 0;
+    while (true) {
+        if (token_buf[token_pos].type == DQUOTE) {
+            break;
+        } else if (token_buf[token_pos].type == STRING_PART) {
+            Span span = token_buf[token_pos].span;
+            memcpy(&str_buf[str_len], &input_buf[span.start], span.len);
+            str_len += span.len;
+            token_pos++;
+        } else {
+            fprintf(stderr, "unexpected token when parsing statement at %zu: %s\n",
+                    token_buf[token_pos].span.start, token_name[token_buf[token_pos].type]);
+            return string;
+        }
+    }
     token_pos++;
 
-    // TODO: escape sequences
     char symbol_name_buf[16] = {0};
     sprintf(symbol_name_buf, ".str%zu", symbols_local_size);
-    size_t string_size = string.span->len - 2;
-    size_t symbol_idx = symbol_add_local(symbol_name_buf, rodata_size, string_size);
+
+    size_t symbol_idx = symbol_add_local(symbol_name_buf, rodata_size, str_len);
     string.operand = (Operand){
         .tag = MEMORY,
         .o = {.memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx}},
     };
-    memcpy(&rodata_buf[rodata_size], &input_buf[string.span->start + 1], string_size);
-    rodata_size += string_size;
+    memcpy(&rodata_buf[rodata_size], &str_buf, str_len);
+    rodata_size += str_len + 1;
 
+    string.ok = true;
     return string;
 }
 
@@ -119,7 +137,7 @@ bool visit_op() {
     return false;
 }
 
-// unary = IDENT | INT | STRING | "&" IDENT | "(" expr ")"
+// unary = IDENT | INT | string | "&" IDENT | "(" expr ")"
 Expr visit_unary() {
     Expr expr = {};
     if (token_buf[token_pos].type == IDENT) {
@@ -129,7 +147,7 @@ Expr visit_unary() {
         Int i = visit_int();
         if (!i.ok) return expr;
         expr.operand = (Operand){.tag = IMMEDIATE, .o = {.immediate = {.value = i.value}}};
-    } else if (token_buf[token_pos].type == STRING) {
+    } else if (token_buf[token_pos].type == DQUOTE) {
         String string = visit_string();
         if (!string.ok) return expr;
         expr.operand = string.operand;

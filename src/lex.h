@@ -19,13 +19,42 @@ bool is_ident(char c, size_t len) {
 
 Token next_token() {
     Token token = {};
+    token.span.start = token_offset;
+
+    if (input_buf[token_offset] == '"') {
+        inside_string = !inside_string;
+        token.span.len = 1;
+        token.type = DQUOTE;
+        token_offset += token.span.len;
+        return token;
+    }
+    if (inside_string) {
+        size_t str_len = 0;
+        if (input_buf[token_offset] == '\\') {
+            fprintf(stderr, "TODO escape sequence\n");
+            return token;
+        } else {
+            while (token_offset < input_size) {
+                if (str_len > 0 && input_buf[token_offset + str_len] == '"') {
+                    token.span.len = str_len;
+                    token.type = STRING_PART;
+                    token_offset += token.span.len;
+                    return token;
+                }
+                str_len++;
+            }
+            fprintf(stderr, "non-terminated string at %zu\n", token_offset);
+            return token;
+        }
+    }
+
     while (token_offset < input_size &&
            (!is_printable(input_buf[token_offset]) || input_buf[token_offset] == ' ')) {
         token_offset++;
     }
     if (token_offset >= input_size) return token;
-
     token.span.start = token_offset;
+
     for (size_t i = 0; i < token_literal_size; i++) {
         if (token_literal[i] == 0) continue;
         if (strncmp(&input_buf[token_offset], token_literal[i], strlen(token_literal[i])) == 0) {
@@ -55,23 +84,6 @@ Token next_token() {
         token.span.len = int_len;
         token.type = INT;
         token_offset += token.span.len;
-        return token;
-    }
-
-    // TODO: escape sequences
-    size_t str_len = 0;
-    if (input_buf[token_offset] == '"') {
-        while (token_offset < input_size) {
-            if (str_len > 0 && input_buf[token_offset + str_len] == '"') {
-                str_len++;
-                token.span.len = str_len;
-                token.type = STRING;
-                token_offset += token.span.len;
-                return token;
-            }
-            str_len++;
-        }
-        fprintf(stderr, "non-terminated string at %zu\n", token_offset);
         return token;
     }
 

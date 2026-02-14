@@ -11,8 +11,9 @@ return    = "return" expr ";"
 expr      = unary (op unary)?
 unary     = IDENT
           | INT
-          | STRING
+          | string
           | "&" IDENT
           | "(" expr ")"
 op        = "+" | "-" | "&" | "|" | "^" | "<<" | ">>"
           | "==" | "!=" | "<" | ">" | "<=" | ">="
+string    = "\"" (STRING_PART | ESCAPE_SEQ)+ "\""
