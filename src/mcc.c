@@ -30,6 +30,7 @@ int32_t main(int32_t argc, char* argv[]) {
         fprintf(stderr, "error parsing program\n");
         return 1;
     }
+    assert(stack_size == 1);
 
     char* out_path = argv[2];
     FILE* out_file = fopen(out_path, "w");

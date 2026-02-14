@@ -6,13 +6,13 @@ build:
 compile_hello: build
 	build/mcc test/hello.c build/hello.o
 
-inspect_hello: compile_hello
-	xxd build/hello.o
-	readelf -a build/hello.o
-	objdump -d -M intel build/hello.o
-
 link_hello: compile_hello
 	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/hello.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/hello
 
 run_hello: link_hello
 	build/hello
+
+inspect_hello:
+	xxd build/hello.o
+	readelf -a build/hello.o
+	objdump -d -M intel build/hello.o

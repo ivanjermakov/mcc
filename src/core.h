@@ -1,4 +1,5 @@
 #pragma once
+#include "assert.h"
 #include "elf.h"
 #include "stdbool.h"
 #include "stdint.h"
@@ -57,9 +58,94 @@ uint8_t rodata_buf[1 << 10];
 size_t rodata_size = 0;
 uint8_t symbol_names_buf[1 << 10];
 size_t symbol_names_size = 1;
+
 ElfSymbolEntry symbols_local_buf[1 << 10];
 size_t symbols_local_size = 1;
-ElfSymbolEntry symbols_global_buf[1 << 10];
-size_t symbols_global_size = 0;
-ElfRelocationEntry relocations_buf[1 << 10];
-size_t relocations_size = 0;
+
+typedef enum {
+    REGISTER,
+    IMMEDIATE,
+    MEMORY,
+} OperandTag;
+
+typedef struct {
+    uint8_t i;
+    uint8_t size;
+} OperandRegister;
+
+typedef struct {
+    int64_t value;
+} OperandImmediate;
+
+typedef enum {
+    RIP,
+    SYMBOL_LOCAL,
+    SYMBOL_GLOBAL,
+} AddressingMode;
+
+typedef struct {
+    AddressingMode mode;
+    int64_t offset;
+} OperandMemory;
+
+typedef struct {
+    OperandTag tag;
+    union {
+        OperandRegister reg;
+        OperandImmediate immediate;
+        OperandMemory memory;
+    } o;
+} Operand;
+
+typedef struct {
+    Span span;
+    Operand operand;
+    size_t index;
+    ElfSymbolEntry entry;
+} Symbol;
+
+/**
+ * Flat array of symbols that can be resolved by name
+ */
+Symbol symbols_buf[1 << 10];
+size_t symbols_size = 0;
+/**
+ * `symbols_buf[stack[n]]` is the first symbol in stack scope `n`
+ */
+size_t stack[1 << 10];
+size_t stack_size = 0;
+
+void stack_push() {
+    stack[stack_size++] = symbols_size;
+}
+
+void stack_pop() {
+    stack_size--;
+    symbols_size = stack[stack_size];
+}
+
+size_t stack_scope_size(size_t i) {
+    return (i == stack_size - 1 ? symbols_size : stack[i + 1]) - stack[i];
+}
+
+int32_t span_cmp(Span a, Span b) {
+    if (a.len != b.len) return a.len - b.len;
+    return strncmp(&input_buf[a.start], &input_buf[b.start], a.len);
+}
+
+typedef enum {
+    PC32 = 2,
+    PLT32 = 4,
+} ElfRelocationType;
+
+typedef struct {
+    Symbol* symbol;
+    ElfRelocationType type;
+    size_t offset;
+} SymbolRelocation;
+
+SymbolRelocation global_relocations_buf[1 << 10];
+size_t global_relocations_size = 0;
+
+ElfRelocationEntry local_relocations_buf[1 << 10];
+size_t local_relocations_size = 0;

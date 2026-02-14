@@ -71,7 +71,7 @@ Token next_token() {
             }
             str_len++;
         }
-        printf("non-terminated string at %zu\n", token_offset);
+        fprintf(stderr, "non-terminated string at %zu\n", token_offset);
         return token;
     }
 

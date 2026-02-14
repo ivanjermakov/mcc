@@ -1,41 +1,6 @@
 #pragma once
 #include "core.h"
 
-typedef enum {
-    REGISTER,
-    IMMEDIATE,
-    MEMORY,
-} OperandTag;
-
-typedef struct {
-    uint8_t i;
-    uint8_t size;
-} OperandRegister;
-
-typedef struct {
-    int64_t value;
-} OperandImmediate;
-
-typedef enum {
-    RIP,
-    SYMBOL_LOCAL,
-    SYMBOL_GLOBAL,
-} AddressingMode;
-
-typedef struct {
-    AddressingMode mode;
-    int64_t offset;
-} OperandMemory;
-
-typedef struct {
-    OperandTag tag;
-    union {
-        OperandRegister reg;
-        OperandImmediate immediate;
-        OperandMemory memory;
-    } o;
-} Operand;
-
 const Operand RAX = {.tag = REGISTER, .o = {.reg = {.i = 0, .size = 64}}};
 const Operand RCX = {.tag = REGISTER, .o = {.reg = {.i = 1, .size = 64}}};
 const Operand RDX = {.tag = REGISTER, .o = {.reg = {.i = 2, .size = 64}}};
@@ -66,44 +31,14 @@ ElfHeader elf_header = {
     .shentsize = 0x40,
 };
 
-typedef enum {
-    PC32 = 2,
-    PLT32 = 4,
-} ElfRelocationType;
-
-void relocation_add(ElfRelocationType type, size_t symbol_index, size_t offset) {
-    relocations_buf[relocations_size++] = (ElfRelocationEntry){
+void relocation_add_local(ElfRelocationType type, size_t symbol_index, size_t offset) {
+    local_relocations_buf[local_relocations_size++] = (ElfRelocationEntry){
         .offset = offset,
         .type = type,
         .sym = symbol_index,
+        // TODO: explain
         .addend = -4,
     };
-}
-
-typedef struct {
-    bool impl;
-} AddSymbolOptions;
-
-size_t symbol_add_global(Span name, size_t pos, AddSymbolOptions opts) {
-    memcpy(&symbol_names_buf[symbol_names_size], &input_buf[name.start], name.len);
-    size_t idx = symbols_global_size;
-    symbols_global_buf[symbols_global_size++] = (ElfSymbolEntry){
-        .name = (uint32_t)symbol_names_size,
-        .info = (uint8_t)((1 << 4) + (opts.impl ? 2 : 0)),
-        .shndx = (uint16_t)(opts.impl ? 1 : 0),
-        .value = pos,
-    };
-    symbol_names_size += name.len + 1;
-    return idx;
-}
-
-size_t symbol_add_local(char* name, size_t pos, size_t size) {
-    memcpy(&symbol_names_buf[symbol_names_size], name, strlen(name));
-    size_t idx = symbols_local_size;
-    symbols_local_buf[symbols_local_size++] = (ElfSymbolEntry){
-        .name = (uint32_t)symbol_names_size, .info = 1, .shndx = 2, .value = pos, .size = size};
-    symbol_names_size += strlen(name) + 1;
-    return idx;
 }
 
 void asm_nop() {
@@ -128,7 +63,7 @@ void asm_mov(Operand a, Operand b) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8B;
         text_buf[text_size++] = (uint8_t)((0 << 6) | (a.o.reg.i << 3) | 5);
-        relocation_add(PC32, b.o.memory.offset, text_size);
+        relocation_add_local(b.o.memory.offset, PC32, text_size);
         text_size += 4;
         return;
     }
@@ -141,7 +76,7 @@ void asm_lea(Operand a, Operand b) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8D;
         text_buf[text_size++] = (uint8_t)((0 << 6) | (a.o.reg.i << 3) | 5);
-        relocation_add(PC32, b.o.memory.offset, text_size);
+        relocation_add_local(PC32, b.o.memory.offset, text_size);
         text_size += 4;
         return;
     }
@@ -171,9 +106,13 @@ void asm_ret() {
     text_buf[text_size++] = 0xC3;
 }
 
-void asm_call(size_t symbol_index) {
+void asm_call_global(Symbol* symbol) {
     text_buf[text_size++] = 0xE8;
-    relocation_add(PLT32, symbol_index, text_size);
+    global_relocations_buf[global_relocations_size++] = (SymbolRelocation){
+        .symbol = symbol,
+        .type = PLT32,
+        .offset = text_size,
+    };
     text_size += 4;
 }
 
@@ -211,14 +150,34 @@ void write_elf(FILE* out_file) {
     memcpy(&sections_buf[sections_size], &symbols_local_buf,
            sizeof(ElfSymbolEntry) * symbols_local_size);
     sections_size += sizeof(ElfSymbolEntry) * symbols_local_size;
-    memcpy(&sections_buf[sections_size], &symbols_global_buf,
-           sizeof(ElfSymbolEntry) * symbols_global_size);
-    sections_size += sizeof(ElfSymbolEntry) * symbols_global_size;
+
+    size_t global_scope_size = stack_scope_size(0);
+    for (size_t i = 0; i < global_scope_size; i++) {
+        Symbol* symbol = &symbols_buf[i];
+        symbol->index = symbols_local_size + i;
+        ElfSymbolEntry entry = symbol->entry;
+        memcpy(&sections_buf[sections_size], &entry, sizeof entry);
+        sections_size += sizeof entry;
+    }
 
     uint64_t section_reltext_offset = sizeof elf_header + sections_size;
-    memcpy(&sections_buf[sections_size], &relocations_buf,
-           sizeof(ElfRelocationEntry) * relocations_size);
-    sections_size += sizeof(ElfRelocationEntry) * relocations_size;
+
+    memcpy(&sections_buf[sections_size], &local_relocations_buf,
+           sizeof(ElfRelocationEntry) * local_relocations_size);
+    sections_size += sizeof(ElfRelocationEntry) * local_relocations_size;
+
+    for (size_t i = 0; i < global_relocations_size; i++) {
+        SymbolRelocation sym = global_relocations_buf[i];
+        ElfRelocationEntry entry = (ElfRelocationEntry){
+            .offset = sym.offset,
+            .type = sym.type,
+            .sym = sym.symbol->index,
+            // TODO: explain
+            .addend = -4,
+        };
+        memcpy(&sections_buf[sections_size], &entry, sizeof entry);
+        sections_size += sizeof entry;
+    }
 
     uint64_t section_header_table_offset = sizeof elf_header + sections_size;
     ElfSectionHeader null = {0};
@@ -268,7 +227,7 @@ void write_elf(FILE* out_file) {
         .name = shstrtab_offsets[5],
         .type = 2,
         .offset = section_symtab_offset,
-        .size = sizeof(ElfSymbolEntry) * (symbols_local_size + symbols_global_size),
+        .size = sizeof(ElfSymbolEntry) * (symbols_local_size + global_scope_size),
         .link = 4,                  // index of .strtab section
         .info = symbols_local_size, // index of the first non-local symbol
         .entsize = sizeof(ElfSymbolEntry),
@@ -280,7 +239,7 @@ void write_elf(FILE* out_file) {
         .name = shstrtab_offsets[6],
         .type = 4,
         .offset = section_reltext_offset,
-        .size = sizeof(ElfRelocationEntry) * relocations_size,
+        .size = sizeof(ElfRelocationEntry) * (local_relocations_size + global_relocations_size),
         .link = 5, // index of a .symtab section
         .info = 1, // index of a .rel.text section
         .entsize = sizeof(ElfRelocationEntry),

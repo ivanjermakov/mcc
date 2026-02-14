@@ -2,6 +2,45 @@
 #include "core.h"
 #include "emit.h"
 
+Symbol* symbol_find(Span span) {
+    if (stack_size == 0) return NULL;
+    for (size_t scope = stack_size - 1; scope >= 0; scope--) {
+        size_t scope_size = stack_scope_size(scope);
+        for (size_t i = 0; i < scope_size; i++) {
+            Symbol* s = &symbols_buf[stack[scope] + i];
+            if (span_cmp(span, s->span) == 0) {
+                return s;
+            }
+        }
+    }
+    return NULL;
+}
+
+Symbol* symbol_add_global(Span name, size_t pos, bool impl) {
+    memcpy(&symbol_names_buf[symbol_names_size], &input_buf[name.start], name.len);
+    symbols_buf[symbols_size++] = (Symbol){
+        .span = name,
+        .entry =
+            {
+                .name = (uint32_t)symbol_names_size,
+                .info = (uint8_t)((1 << 4) + (impl ? 2 : 0)),
+                .shndx = (uint16_t)(impl ? 1 : 0),
+                .value = pos,
+            },
+    };
+    symbol_names_size += name.len + 1;
+    return &symbols_buf[symbols_size];
+}
+
+size_t symbol_add_local(char* name, size_t pos, size_t size) {
+    memcpy(&symbol_names_buf[symbol_names_size], name, strlen(name));
+    size_t idx = symbols_local_size;
+    symbols_local_buf[symbols_local_size++] = (ElfSymbolEntry){
+        .name = (uint32_t)symbol_names_size, .info = 1, .shndx = 2, .value = pos, .size = size};
+    symbol_names_size += strlen(name) + 1;
+    return idx;
+}
+
 typedef struct {
     bool ok;
     Operand operand;
@@ -46,10 +85,10 @@ String visit_string() {
 
 typedef struct {
     bool ok;
-    Span* span;
+    Span span;
 } Ident;
 Ident visit_ident() {
-    Ident ident = {.ok = true, .span = &token_buf[token_pos].span};
+    Ident ident = {.ok = true, .span = token_buf[token_pos].span};
     token_pos++;
     return ident;
 }
@@ -148,9 +187,18 @@ bool visit_call() {
     token_pos++;
     token_pos++;
 
-    // TODO: find symbol index
-    size_t symbol_idx = 2;
-    asm_call(symbol_idx);
+    Symbol* symbol = symbol_find(name.span);
+    if (symbol == NULL) {
+        fprintf(stderr, "name not found\n");
+        fprintf(stderr, "\n");
+        return false;
+    }
+    if (symbol->entry.name != 0) {
+        asm_call_global(symbol);
+    } else {
+        fprintf(stderr, "TODO asm call\n");
+        return false;
+    }
 
     return true;
 }
@@ -229,10 +277,12 @@ bool visit_func_decl() {
     }
     token_pos++;
     if (token_buf[token_pos].type == SEMI) {
-        symbol_add_global(*name.span, symbol_pos, (AddSymbolOptions){.impl = false});
+        symbol_add_global(name.span, symbol_pos, false);
+
         token_pos++;
     } else if (token_buf[token_pos].type == O_BRACE) {
-        symbol_add_global(*name.span, symbol_pos, (AddSymbolOptions){.impl = true});
+        symbol_add_global(name.span, symbol_pos, true);
+
         asm_push(RBP);
         asm_mov(RBP, RSP);
 
@@ -258,6 +308,7 @@ bool visit_var_decl() {
 
 // program = (var_decl | func_decl)+
 bool visit_program() {
+    stack_push();
     while (token_pos < token_size) {
         // TODO: dry-parse type to figure out correct offset
         if (token_buf[token_pos + 2].type == O_PAREN || token_buf[token_pos + 3].type == O_PAREN) {
