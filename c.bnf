@@ -16,4 +16,4 @@ unary     = IDENT
           | "(" expr ")"
 op        = "+" | "-" | "&" | "|" | "^" | "<<" | ">>"
           | "==" | "!=" | "<" | ">" | "<=" | ">="
-string    = "\"" (STRING_PART | ESCAPE_SEQ)+ "\""
+string    = "\"" (STRING_PART | ESCAPE)+ "\""

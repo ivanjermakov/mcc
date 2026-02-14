@@ -31,21 +31,29 @@ Token next_token() {
     if (inside_string) {
         size_t str_len = 0;
         if (input_buf[token_offset] == '\\') {
-            fprintf(stderr, "TODO escape sequence\n");
-            return token;
-        } else {
-            while (token_offset < input_size) {
-                if (str_len > 0 && input_buf[token_offset + str_len] == '"') {
-                    token.span.len = str_len;
-                    token.type = STRING_PART;
-                    token_offset += token.span.len;
-                    return token;
-                }
-                str_len++;
+            // TODO: wrap str_len++ into advance() to check for EOF
+            uint8_t c = input_buf[token_offset];
+            if (is_digit(c) || c == 'x' || c == 'u' || c == 'U') {
+                fprintf(stderr, "TODO byte escape sequence\n");
+                return token;
             }
-            fprintf(stderr, "non-terminated string at %zu\n", token_offset);
+            token.span.len = 2;
+            token.type = ESCAPE;
+            token_offset += token.span.len;
             return token;
         }
+        while (token_offset < input_size) {
+            if (input_buf[token_offset + str_len] == '"' ||
+                input_buf[token_offset + str_len] == '\\') {
+                token.span.len = str_len;
+                token.type = STRING_PART;
+                token_offset += token.span.len;
+                return token;
+            }
+            str_len++;
+        }
+        fprintf(stderr, "non-terminated string at %zu\n", token_offset);
+        return token;
     }
 
     while (token_offset < input_size &&

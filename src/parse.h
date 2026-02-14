@@ -68,18 +68,42 @@ String visit_string() {
     String string = {};
 
     token_pos++;
-    size_t str_buf[1 << 10];
+    uint8_t str_buf[1 << 10] = {0};
     size_t str_len = 0;
     while (true) {
+        Span span = token_buf[token_pos].span;
         if (token_buf[token_pos].type == DQUOTE) {
             break;
         } else if (token_buf[token_pos].type == STRING_PART) {
-            Span span = token_buf[token_pos].span;
             memcpy(&str_buf[str_len], &input_buf[span.start], span.len);
             str_len += span.len;
             token_pos++;
+        } else if (token_buf[token_pos].type == ESCAPE) {
+            size_t start = token_buf[token_pos].span.start;
+            uint8_t c = input_buf[start + 1];
+            uint8_t b;
+            switch (c) {
+                case 'a': b = 0x07; break;
+                case 'b': b = 0x08; break;
+                case 'e': b = 0x1B; break;
+                case 'f': b = 0x0C; break;
+                case 'n': b = 0x0A; break;
+                case 'r': b = 0x0D; break;
+                case 't': b = 0x09; break;
+                case 'v': b = 0x0B; break;
+                case '\\': b = 0x5C; break;
+                case '\'': b = 0x27; break;
+                case '"': b = 0x22; break;
+                default: {
+                    fprintf(stderr, "TODO byte escape sequence\n");
+                    return string;
+                }
+            }
+            memcpy(&str_buf[str_len], &b, 1);
+            str_len += 1;
+            token_pos++;
         } else {
-            fprintf(stderr, "unexpected token when parsing statement at %zu: %s\n",
+            fprintf(stderr, "unexpected token when parsing string at %zu: %s\n",
                     token_buf[token_pos].span.start, token_name[token_buf[token_pos].type]);
             return string;
         }

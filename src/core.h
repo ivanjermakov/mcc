@@ -17,6 +17,7 @@ typedef enum {
     IDENT,
     INT,
     STRING_PART,
+    ESCAPE,
     HASH,
     SEMI,
     DQUOTE,
@@ -32,12 +33,12 @@ typedef enum {
     OP_PLUS,
 } TokenType;
 const char* token_literal[] = {
-    0, 0, 0, 0, "#", ";", "\"", "{", "}", "(", ")", ",", "*", "&", "if", "return", "+",
+    0, 0, 0, 0, 0, "#", ";", "\"", "{", "}", "(", ")", ",", "*", "&", "if", "return", "+",
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
-const char* token_name[] = {"NONE",     "IDENT",     "INT",     "STRING_PART", "HASH",    "SEMI",
-                            "DQUOTE",   "O_BRACE",   "C_BRACE", "O_PAREN",     "C_PAREN", "COMMA",
-                            "ASTERISK", "AMPERSAND", "IF",      "RETURN",      "OP_PLUS"};
+const char* token_name[] = {"NONE",  "IDENT",    "INT",       "STRING_PART", "ESCAPE",  "HASH",
+                            "SEMI",  "DQUOTE",   "O_BRACE",   "C_BRACE",     "O_PAREN", "C_PAREN",
+                            "COMMA", "ASTERISK", "AMPERSAND", "IF",          "RETURN",  "OP_PLUS"};
 
 typedef struct {
     Span span;
