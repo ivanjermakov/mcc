@@ -1,6 +1,7 @@
 #pragma once
 #include "core.h"
 #include "emit.h"
+#include "expr.h"
 
 Symbol* symbol_find(Span span) {
     if (stack_size == 0) return NULL;
@@ -42,11 +43,6 @@ size_t symbol_add_rodata(char* name, size_t name_size, size_t pos, size_t size) 
     symbol_names_size += name_size + 1;
     return idx;
 }
-
-typedef struct {
-    bool ok;
-    Operand operand;
-} Expr;
 
 Expr visit_call();
 
@@ -160,10 +156,13 @@ Type visit_type() {
 
 // op = "+" | "-" | "&" | "|" | "^" | "<<" | ">>"
 //    | "==" | "!=" | "<" | ">" | "<=" | ">="
-bool visit_op() {
+Operator visit_op() {
+    if (token_buf[token_pos].type == OP_PLUS) {
+        token_pos++;
+        return OP_ADD;
+    }
     fprintf(stderr, "TODO visit_op\n");
-    token_pos++;
-    return true;
+    return 0;
 }
 
 // unary = call | IDENT | INT | string | "&" IDENT | "(" expr ")"
@@ -199,23 +198,6 @@ Expr visit_unary() {
         return expr;
     }
     expr.ok = true;
-    return expr;
-}
-
-// expr = unary (op unary)*
-Expr visit_expr() {
-    Expr expr = {};
-    Expr unary = visit_unary();
-    if (!unary.ok) return expr;
-    while (token_buf[token_pos].type >= OP_PLUS && token_buf[token_pos].type <= OP_EQUAL) {
-        bool ok = visit_op();
-        if (!ok) return expr;
-        unary = visit_unary();
-        if (!unary.ok) return expr;
-    }
-    expr.ok = true;
-    // TODO: precedence parsing
-    expr.operand = unary.operand;
     return expr;
 }
 

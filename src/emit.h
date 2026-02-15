@@ -17,6 +17,9 @@ const Operand R12 = {.tag = REGISTER, .o = {.reg = {.i = 12, .size = 64}}};
 const Operand R13 = {.tag = REGISTER, .o = {.reg = {.i = 13, .size = 64}}};
 const Operand R14 = {.tag = REGISTER, .o = {.reg = {.i = 14, .size = 64}}};
 const Operand R15 = {.tag = REGISTER, .o = {.reg = {.i = 15, .size = 64}}};
+
+Operand expr_registers[] = {RAX, RCX, RDX, RBX, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15};
+size_t expr_registers_busy = 0;
 Operand argument_registers[] = {RDI, RSI, RDX, RCX, R8, R9};
 
 ElfHeader elf_header = {
@@ -104,6 +107,13 @@ void asm_mov(Operand a, Operand b) {
         text_size += 4;
         return;
     }
+    if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x8B;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.o.reg.i, RM_DI);
+        text_buf[text_size++] = (uint8_t)b.o.memory.offset;
+        return;
+    }
     if (a.tag == MEMORY && a.o.memory.mode == REL_RBP && b.tag == REGISTER) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x89;
@@ -165,6 +175,24 @@ void asm_call_global(Symbol* symbol) {
         .offset = text_size,
     };
     text_size += 4;
+}
+
+void asm_add(Operand a, Operand b) {
+    if (a.tag == REGISTER && b.tag == REGISTER) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x03;
+        text_buf[text_size++] = modrm(MOD_REGISTER, b.o.reg.i, a.o.reg.i);
+        return;
+    }
+    if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x03;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.o.reg.i, RM_DI);
+        text_buf[text_size++] = (uint8_t)b.o.memory.offset;
+        return;
+    }
+    fprintf(stderr, "TODO asm_add\n");
+    asm_nop();
 }
 
 void write_elf(FILE* out_file) {

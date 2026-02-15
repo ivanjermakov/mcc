@@ -105,6 +105,31 @@ typedef struct {
 } Operand;
 
 typedef struct {
+    bool ok;
+    Operand operand;
+} Expr;
+
+typedef enum {
+    OP_ADD = 1,
+} Operator;
+
+uint8_t operator_precedence[] = {
+    0,
+    1,
+};
+
+typedef enum {
+    ASSOC_NONE,
+    ASSOC_LEFT,
+    ASSOC_RIGHT,
+} Associativity;
+
+uint8_t operator_associativity[] = {
+    ASSOC_NONE,
+    ASSOC_LEFT,
+};
+
+typedef struct {
     Span span;
     Operand operand;
     size_t index;
