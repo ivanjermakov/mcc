@@ -41,6 +41,43 @@ void relocation_add_local(ElfRelocationType type, size_t symbol_index, size_t of
     };
 }
 
+typedef enum {
+    // [BX + SI]
+    RM_BX_SI = 0,
+    // [BX + DI]
+    RM_BX_DI = 1,
+    // [BP + SI]
+    RM_BP_SI = 2,
+    // [BP + DI]
+    RM_BP_DI = 3,
+    // [SI]
+    RM_SI = 4,
+    // [DI]
+    RM_DI = 5,
+    // [BP]   (mod=00 → disp32)
+    RM_BP = 6,
+    // [BX]
+    RM_BX = 7
+} ModrmRm;
+
+typedef enum {
+    // [rm]
+    MOD_INDIRECT = 0b00,
+    // [rm + disp8]
+    MOD_INDIRECT_DISP8 = 0b01,
+    // [rm + disp32]
+    MOD_INDIRECT_DISP32 = 0b10,
+    // register operand
+    MOD_REGISTER = 0b11
+} ModrmMod;
+
+uint8_t modrm(ModrmMod mod, uint8_t reg, uint8_t rm) {
+    assert(mod < 4);
+    assert(reg < 8);
+    assert(rm < 8);
+    return (uint8_t)((mod << 6) | (reg << 3) | rm);
+}
+
 void asm_nop() {
     text_buf[text_size++] = 0x90;
 }
@@ -49,7 +86,7 @@ void asm_mov(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x89;
-        text_buf[text_size++] = (3 << 6) | (b.o.reg.i << 3) | (a.o.reg.i);
+        text_buf[text_size++] = modrm(MOD_REGISTER, b.o.reg.i, a.o.reg.i);
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
@@ -62,9 +99,23 @@ void asm_mov(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == SYMBOL_LOCAL) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8B;
-        text_buf[text_size++] = (uint8_t)((0 << 6) | (a.o.reg.i << 3) | 5);
+        text_buf[text_size++] = modrm(MOD_INDIRECT, a.o.reg.i, RM_DI);
         relocation_add_local(PC32, b.o.memory.offset, text_size);
         text_size += 4;
+        return;
+    }
+    if (a.tag == MEMORY && a.o.memory.mode == REL_RBP && b.tag == REGISTER) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x89;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, b.o.reg.i, RM_DI);
+        text_buf[text_size++] = (uint8_t)a.o.memory.offset;
+        return;
+    }
+    if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x8b;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.o.reg.i, RM_DI);
+        text_buf[text_size++] = (uint8_t)b.o.memory.offset;
         return;
     }
     fprintf(stderr, "TODO asm_mov\n");
@@ -75,7 +126,7 @@ void asm_lea(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == SYMBOL_LOCAL) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8D;
-        text_buf[text_size++] = (uint8_t)((0 << 6) | (a.o.reg.i << 3) | 5);
+        text_buf[text_size++] = modrm(0, a.o.reg.i, 5);
         relocation_add_local(PC32, b.o.memory.offset, text_size);
         text_size += 4;
         return;

@@ -228,10 +228,10 @@ Expr visit_define() {
     if (!name.ok) return define;
 
     Scope* scope = &stack[stack_size];
-    scope->bp_offset += 8;
+    scope->bp_offset -= 8;
     define.operand = (Operand){
         .tag = MEMORY,
-        .o = {.memory = {.mode = MODE_RBP, .offset = scope->bp_offset}},
+        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset}},
     };
     symbols_buf[symbols_size++] = (Symbol){
         .span = name.span,
@@ -276,7 +276,11 @@ Expr visit_call() {
         if (!expr.ok) return call;
         if (token_buf[token_pos].type == SEMI) token_pos++;
 
-        asm_lea(argument_registers[arg_idx], expr.operand);
+        if (expr.operand.tag == MEMORY && expr.operand.o.memory.mode == SYMBOL_LOCAL) {
+            asm_lea(argument_registers[arg_idx], expr.operand);
+        } else {
+            asm_mov(argument_registers[arg_idx], expr.operand);
+        }
         arg_idx++;
         if (token_buf[token_pos].type == COMMA) token_pos++;
         if (token_buf[token_pos].type == C_PAREN) break;
@@ -352,10 +356,10 @@ Param visit_param(size_t param_index) {
     if (!param.name.ok) return param;
 
     Scope* scope = &stack[stack_size];
-    scope->bp_offset += 8;
+    scope->bp_offset -= 8;
     param.operand = (Operand){
         .tag = MEMORY,
-        .o = {.memory = {.mode = MODE_RBP, .offset = scope->bp_offset}},
+        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset}},
     };
     symbols_buf[symbols_size++] = (Symbol){
         .span = param.name.span,

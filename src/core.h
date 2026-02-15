@@ -84,8 +84,8 @@ typedef struct {
 } OperandImmediate;
 
 typedef enum {
-    MODE_RIP,
-    MODE_RBP,
+    REL_RIP,
+    REL_RBP,
     SYMBOL_LOCAL,
     SYMBOL_GLOBAL,
 } AddressingMode;
