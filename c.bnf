@@ -4,12 +4,14 @@ func_decl = type IDENT "(" param ("," param)* ")" (";" | block)
 param     = type IDENT
 type      = IDENT "*"?
 block     = "{" statement* "}"
-statement = if | call | return
+statement = if | (expr ";") | return | define
 if        = "if" "(" expr ")" block ";"
-call      = IDENT "(" expr ("," expr)* ")" ";"
+call      = IDENT "(" expr ("," expr)* ")"
 return    = "return" expr ";"
-expr      = unary (op unary)?
-unary     = IDENT
+define    = type IDENT ("=" expr)? ";"
+expr      = unary (op unary)*
+unary     = call
+          | IDENT
           | INT
           | string
           | "&" IDENT

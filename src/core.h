@@ -31,14 +31,16 @@ typedef enum {
     IF,
     RETURN,
     OP_PLUS,
+    OP_EQUAL,
 } TokenType;
 const char* token_literal[] = {
-    0, 0, 0, 0, 0, "#", ";", "\"", "{", "}", "(", ")", ",", "*", "&", "if", "return", "+",
+    0, 0, 0, 0, 0, "#", ";", "\"", "{", "}", "(", ")", ",", "*", "&", "if", "return", "+", "=",
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
-const char* token_name[] = {"NONE",  "IDENT",    "INT",       "STRING_PART", "ESCAPE",  "HASH",
-                            "SEMI",  "DQUOTE",   "O_BRACE",   "C_BRACE",     "O_PAREN", "C_PAREN",
-                            "COMMA", "ASTERISK", "AMPERSAND", "IF",          "RETURN",  "OP_PLUS"};
+const char* token_name[] = {"NONE",    "IDENT",   "INT",     "STRING_PART", "ESCAPE",
+                            "HASH",    "SEMI",    "DQUOTE",  "O_BRACE",     "C_BRACE",
+                            "O_PAREN", "C_PAREN", "COMMA",   "ASTERISK",    "AMPERSAND",
+                            "IF",      "RETURN",  "OP_PLUS", "OP_EQUAL"};
 
 typedef struct {
     Span span;
@@ -82,7 +84,8 @@ typedef struct {
 } OperandImmediate;
 
 typedef enum {
-    RIP,
+    MODE_RIP,
+    MODE_RBP,
     SYMBOL_LOCAL,
     SYMBOL_GLOBAL,
 } AddressingMode;
@@ -108,6 +111,11 @@ typedef struct {
     ElfSymbolEntry entry;
 } Symbol;
 
+typedef struct {
+    size_t symbols_start;
+    int64_t bp_offset;
+} Scope;
+
 /**
  * Flat array of symbols that can be resolved by name
  */
@@ -116,20 +124,24 @@ size_t symbols_size = 0;
 /**
  * `symbols_buf[stack[n]]` is the first symbol in stack scope `n`
  */
-size_t stack[1 << 10];
+Scope stack[1 << 10];
 size_t stack_size = 0;
 
 void stack_push() {
-    stack[stack_size++] = symbols_size;
+    stack[stack_size++] = (Scope){
+        .symbols_start = symbols_size,
+        .bp_offset = 0,
+    };
 }
 
 void stack_pop() {
     stack_size--;
-    symbols_size = stack[stack_size];
+    symbols_size = stack[stack_size].symbols_start;
 }
 
 size_t stack_scope_size(size_t i) {
-    return (i == stack_size - 1 ? symbols_size : stack[i + 1]) - stack[i];
+    return (i == stack_size - 1 ? symbols_size : stack[i + 1].symbols_start) -
+           stack[i].symbols_start;
 }
 
 int32_t span_cmp(Span a, Span b) {

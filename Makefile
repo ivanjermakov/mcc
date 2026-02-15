@@ -16,3 +16,17 @@ inspect_hello:
 	xxd build/hello.o
 	readelf -a build/hello.o
 	objdump -d -M intel build/hello.o
+
+compile_fn: build
+	build/mcc test/fn.c build/fn.o
+
+link_fn: compile_fn
+	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/fn.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/fn
+
+run_fn: link_fn
+	build/fn
+
+inspect_fn:
+	xxd build/fn.o
+	readelf -a build/fn.o
+	objdump -d -M intel build/fn.o

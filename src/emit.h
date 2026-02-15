@@ -63,7 +63,7 @@ void asm_mov(Operand a, Operand b) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8B;
         text_buf[text_size++] = (uint8_t)((0 << 6) | (a.o.reg.i << 3) | 5);
-        relocation_add_local(b.o.memory.offset, PC32, text_size);
+        relocation_add_local(PC32, b.o.memory.offset, text_size);
         text_size += 4;
         return;
     }
@@ -117,7 +117,7 @@ void asm_call_global(Symbol* symbol) {
 }
 
 void write_elf(FILE* out_file) {
-    uint8_t sections_buf[1 << 10] = {0};
+    uint8_t sections_buf[1 << 14] = {0};
     size_t sections_size = 0;
 
     uint64_t section_text_offset = sizeof elf_header + sections_size;
@@ -174,6 +174,7 @@ void write_elf(FILE* out_file) {
             .sym = sym.symbol->index,
             // TODO: explain
             .addend = -4,
+
         };
         memcpy(&sections_buf[sections_size], &entry, sizeof entry);
         sections_size += sizeof entry;
