@@ -66,6 +66,7 @@ Expr visit_expr() {
 
     bool ok = shunting_yard(expr_stack, &expr_stack_size);
     if (!ok) return (Expr){};
+    bool need_tmp_register = expr_stack_size > 1;
 
     assert(expr_stack_size > 0);
     size_t expr_pos = 0;
@@ -86,7 +87,7 @@ Expr visit_expr() {
             }
         } else {
             Operand o = expr_stack[expr_pos++].e.operand;
-            if (eval_stack_size == 0) {
+            if (eval_stack_size == 0 && need_tmp_register) {
                 asm_mov(expr_registers[expr_registers_busy++], o);
                 eval_stack[eval_stack_size++] = expr_registers[expr_registers_busy];
             } else {
@@ -95,7 +96,13 @@ Expr visit_expr() {
         }
     }
 
-    expr_registers_busy--;
+    Expr res = {.ok = true};
+    if (need_tmp_register) {
+        expr_registers_busy--;
+        res.operand = expr_registers[expr_registers_busy];
+    } else {
+        res.operand = eval_stack[0];
+    }
     assert(expr_registers_busy_pre == expr_registers_busy);
-    return (Expr){.ok = true, .operand = expr_registers[expr_registers_busy]};
+    return res;
 }
