@@ -13,7 +13,7 @@ run_hello: link_hello
 	build/hello
 
 inspect_hello:
-	xxd build/hello.o
+	xxd -c 32 build/hello.o
 	readelf -a build/hello.o
 	objdump -d -M intel build/hello.o
 
@@ -27,6 +27,6 @@ run_fn: link_fn
 	build/fn
 
 inspect_fn:
-	xxd build/fn.o
+	xxd -c 32 build/fn.o
 	readelf -a build/fn.o
 	objdump -d -M intel build/fn.o

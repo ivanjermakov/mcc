@@ -85,6 +85,19 @@ void asm_nop() {
     text_buf[text_size++] = 0x90;
 }
 
+void asm_lea(Operand a, Operand b) {
+    if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == SYMBOL_LOCAL) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x8D;
+        text_buf[text_size++] = modrm(0, a.o.reg.i, 5);
+        relocation_add_local(PC32, b.o.memory.offset, text_size);
+        text_size += 4;
+        return;
+    }
+    fprintf(stderr, "TODO asm_lea\n");
+    asm_nop();
+}
+
 void asm_mov(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
         text_buf[text_size++] = 0x48;
@@ -100,11 +113,7 @@ void asm_mov(Operand a, Operand b) {
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == SYMBOL_LOCAL) {
-        text_buf[text_size++] = 0x48;
-        text_buf[text_size++] = 0x8B;
-        text_buf[text_size++] = modrm(MOD_INDIRECT, a.o.reg.i, RM_DI);
-        relocation_add_local(PC32, b.o.memory.offset, text_size);
-        text_size += 4;
+        asm_lea(a, b);
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
@@ -129,19 +138,6 @@ void asm_mov(Operand a, Operand b) {
         return;
     }
     fprintf(stderr, "TODO asm_mov\n");
-    asm_nop();
-}
-
-void asm_lea(Operand a, Operand b) {
-    if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == SYMBOL_LOCAL) {
-        text_buf[text_size++] = 0x48;
-        text_buf[text_size++] = 0x8D;
-        text_buf[text_size++] = modrm(0, a.o.reg.i, 5);
-        relocation_add_local(PC32, b.o.memory.offset, text_size);
-        text_size += 4;
-        return;
-    }
-    fprintf(stderr, "TODO asm_lea\n");
     asm_nop();
 }
 

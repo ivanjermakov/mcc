@@ -258,11 +258,7 @@ Expr visit_call() {
         if (!expr.ok) return call;
         if (token_buf[token_pos].type == SEMI) token_pos++;
 
-        if (expr.operand.tag == MEMORY && expr.operand.o.memory.mode == SYMBOL_LOCAL) {
-            asm_lea(argument_registers[arg_idx], expr.operand);
-        } else {
-            asm_mov(argument_registers[arg_idx], expr.operand);
-        }
+        asm_mov(argument_registers[arg_idx], expr.operand);
         arg_idx++;
         if (token_buf[token_pos].type == COMMA) token_pos++;
         if (token_buf[token_pos].type == C_PAREN) break;
