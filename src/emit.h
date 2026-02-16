@@ -91,6 +91,7 @@ void asm_lea(Operand a, Operand b) {
         text_buf[text_size++] = 0x8D;
         text_buf[text_size++] = modrm(0, a.o.reg.i, 5);
         relocation_add_local(PC32, b.o.memory.offset, text_size);
+        memset(&text_buf[text_size], 0xAA, 4);
         text_size += 4;
         return;
     }
@@ -170,6 +171,7 @@ void asm_call_global(Symbol* symbol) {
         .type = PLT32,
         .offset = text_size,
     };
+    memset(&text_buf[text_size], 0xAA, 4);
     text_size += 4;
 }
 
