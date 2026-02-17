@@ -1,3 +1,4 @@
+// 0
 void puts(char* s);
 
 int main() {

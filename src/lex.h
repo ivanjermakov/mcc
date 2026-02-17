@@ -55,6 +55,12 @@ Token next_token() {
         fprintf(stderr, "non-terminated string at %zu\n", token_offset);
         return token;
     }
+    if (input_buf[token_offset] == '/' && input_buf[token_offset + 1] == '/') {
+        while (token_offset < input_size && input_buf[token_offset] != '\n') {
+            token_offset++;
+        }
+        return next_token();
+    }
 
     while (token_offset < input_size &&
            (!is_printable(input_buf[token_offset]) || input_buf[token_offset] == ' ')) {
