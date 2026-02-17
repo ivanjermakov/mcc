@@ -3,6 +3,9 @@
 build:
 	clang src/mcc.c -std=c99 -Wall -Wextra -g -o build/mcc
 
+test: build
+	./test.sh
+
 compile_hello: build
 	build/mcc test/hello.c build/hello.o
 
