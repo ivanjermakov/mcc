@@ -32,7 +32,23 @@ Symbol* symbol_add_global(Span name, size_t pos, bool impl) {
             },
     };
     symbol_names_size += name.len + 1;
-    return &symbols_buf[symbols_size];
+    return &symbols_buf[symbols_size - 1];
+}
+
+Symbol* symbol_add_stack(Span name_span, size_t size, size_t count) {
+    Scope* scope = &stack[stack_size];
+    scope->bp_offset -= size;
+    Operand operand = {
+        .tag = MEMORY,
+        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset}},
+    };
+    symbols_buf[symbols_size++] = (Symbol){
+        .span = name_span,
+        .operand = operand,
+        .size = size * count,
+        .item_size = size,
+    };
+    return &symbols_buf[symbols_size - 1];
 }
 
 size_t symbol_add_rodata(char* name, size_t name_size, size_t pos, size_t size) {
@@ -45,6 +61,9 @@ size_t symbol_add_rodata(char* name, size_t name_size, size_t pos, size_t size) 
 }
 
 Expr visit_call();
+bool visit_block();
+bool visit_var_def();
+Expr visit_index();
 
 typedef struct {
     bool ok;
@@ -154,19 +173,84 @@ Type visit_type() {
     return type;
 }
 
-// op = "+" | "-" | "&" | "|" | "^" | "<<" | ">>"
-//    | "==" | "!=" | "<" | ">" | "<=" | ">="
-Operator visit_op() {
-    if (token_buf[token_pos].type == OP_PLUS) {
-        token_pos++;
-        return OP_ADD;
+// op = "=" | "+" | "-" | "&" | "|" | "^" | "<<" | ">>" | "==" | "!=" | "<" | ">" | "<=" | ">="
+Operator visit_op_infix() {
+    Operator op = {};
+    switch (token_buf[token_pos].type) {
+        case EQUALS: {
+            token_pos++;
+            if (token_buf[token_pos].type == EQUALS) {
+                op.tag = OP_EQ;
+                return op;
+            }
+            if (token_buf[token_pos].type == EXCL) {
+                op.tag = OP_NEQ;
+                return op;
+            }
+            op.tag = OP_ASSIGN;
+            return op;
+        }
+        case PLUS: {
+            token_pos++;
+            op.tag = OP_ADD;
+            return op;
+        }
+        case O_ANGLE: {
+            token_pos++;
+            if (token_buf[token_pos].type == EQUALS) {
+                token_pos++;
+                op.tag = OP_LE;
+            } else {
+                op.tag = OP_LT;
+            }
+            return op;
+        }
+        case C_ANGLE: {
+            token_pos++;
+            if (token_buf[token_pos].type == EQUALS) {
+                token_pos++;
+                op.tag = OP_GE;
+            } else {
+                op.tag = OP_GT;
+            }
+            return op;
+        }
+        default:
+            fprintf(stderr, "unexpected token when parsing op_infix at %zu: %s\n",
+                    token_buf[token_pos].span.start, token_name[token_buf[token_pos].type]);
+            return op;
     }
-    fprintf(stderr, "TODO visit_op\n");
-    return 0;
 }
 
-// unary = call | IDENT | INT | string | "&" IDENT | "(" expr ")"
-Expr visit_unary() {
+// op_prefix = "++" | "--" | "+" | "-" | "&" | "*"
+Operator visit_op_prefix() {
+    Operator op = {};
+    switch (token_buf[token_pos].type) {
+        default: {
+        }
+    }
+    return op;
+}
+
+// op_postfix = "++" | "--" | index
+Operator visit_op_postfix() {
+    Operator op = {};
+    switch (token_buf[token_pos].type) {
+        case O_BRACKET: {
+            Expr expr = visit_index();
+            if (!expr.ok) return op;
+            op.tag = OP_INDEX;
+            op.operand = expr.operand;
+            break;
+        }
+        default: {
+        }
+    }
+    return op;
+}
+
+// operand = IDENT | call | INT | string | "(" expr ")"
+Expr visit_operand() {
     Expr expr = {};
     Token t = token_buf[token_pos];
     if (t.type == IDENT && token_buf[token_pos + 1].type == O_PAREN) {
@@ -182,7 +266,7 @@ Expr visit_unary() {
     } else if (t.type == INT) {
         Int i = visit_int();
         if (!i.ok) return expr;
-        expr.operand = (Operand){.tag = IMMEDIATE, .o = {.immediate = {.value = i.value}}};
+        expr.operand = immediate(i.value);
     } else if (t.type == DQUOTE) {
         String string = visit_string();
         if (!string.ok) return expr;
@@ -197,45 +281,40 @@ Expr visit_unary() {
         fprintf(stderr, "TODO %s\n", token_name[t.type]);
         return expr;
     }
+
+    if (token_buf[token_pos].type == PLUS && token_buf[token_pos + 1].type == PLUS) {
+        fprintf(stderr, "TODO inc\n");
+        return expr;
+    }
     expr.ok = true;
     return expr;
 }
 
-// define = type IDENT ("=" expr)? ";"
-Expr visit_define() {
-    Expr define = {};
-    Type type = visit_type();
-    if (!type.ok) return define;
-    Ident name = visit_ident();
-    if (!name.ok) return define;
-
-    Scope* scope = &stack[stack_size];
-    scope->bp_offset -= 8;
-    define.operand = (Operand){
-        .tag = MEMORY,
-        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset}},
-    };
-    symbols_buf[symbols_size++] = (Symbol){
-        .span = name.span,
-        .operand = define.operand,
-    };
-
-    if (token_buf[token_pos].type == OP_EQUAL) {
-        token_pos++;
-        Expr expr = visit_expr();
-        if (!expr.ok) return define;
-        asm_mov(define.operand, expr.operand);
-    }
-    token_pos++;
-
-    define.ok = true;
-    return define;
-}
-
-// if = "if" "(" expr ")" block ";"
+// if = "if" "(" expr ")" block
 bool visit_if() {
     fprintf(stderr, "TODO if\n");
     return false;
+}
+
+// while = "while" "(" expr ")" block
+bool visit_while() {
+    token_pos += 2;
+    Expr expr = visit_expr();
+    if (!expr.ok) return false;
+    token_pos++;
+
+    asm_cmp(expr.operand, immediate(0));
+    size_t je_pos = text_size;
+    asm_canary(1);
+
+    bool ok = visit_block();
+    if (!ok) return false;
+
+    size_t text_size_bak = text_size;
+    asm_je(text_size - je_pos);
+    text_size = text_size_bak;
+
+    return true;
 }
 
 // call = IDENT "(" expr ("," expr)* ")"
@@ -287,19 +366,23 @@ bool visit_return() {
     return true;
 }
 
-// statement = if | (expr ";") | return | define
+// statement = if | while | (expr ";") | return | var_def
 bool visit_statement() {
     if (token_buf[token_pos].type == IF) {
         bool ok = visit_if();
-        if (!ok) return ok;
+        if (!ok) return false;
+    } else if (token_buf[token_pos].type == WHILE) {
+        bool ok = visit_while();
+        if (!ok) return false;
     } else if (token_buf[token_pos].type == RETURN) {
         bool ok = visit_return();
-        if (!ok) return ok;
+        if (!ok) return false;
     } else if (token_buf[token_pos + 2].type == SEMI || token_buf[token_pos + 3].type == SEMI ||
-               token_buf[token_pos + 2].type == OP_EQUAL ||
-               token_buf[token_pos + 3].type == OP_EQUAL) {
-        Expr define = visit_define();
-        if (!define.ok) return define.ok;
+               token_buf[token_pos + 2].type == O_BRACKET ||
+               token_buf[token_pos + 3].type == O_BRACKET ||
+               token_buf[token_pos + 2].type == EQUALS || token_buf[token_pos + 3].type == EQUALS) {
+        bool ok = visit_var_def();
+        if (!ok) return false;
     } else {
         Expr expr = visit_expr();
         if (!expr.ok) return expr.ok;
@@ -349,8 +432,8 @@ Param visit_param(size_t param_index) {
     return param;
 }
 
-// func_decl = type IDENT "(" param ("," param)* ")" (";" | block)
-bool visit_func_decl() {
+// func_def = type IDENT "(" param ("," param)* ")" (";" | block)
+bool visit_func_def() {
     size_t symbol_pos = text_size;
     Ident type_ret = visit_ident();
     if (!type_ret.ok) return type_ret.ok;
@@ -393,7 +476,7 @@ bool visit_func_decl() {
 
         stack_pop();
     } else {
-        fprintf(stderr, "unexpected token when parsing func_decl at %zu: %s\n",
+        fprintf(stderr, "unexpected token when parsing func_def at %zu: %s\n",
                 token_buf[token_pos].span.start, token_name[token_buf[token_pos].type]);
         return false;
     }
@@ -401,22 +484,71 @@ bool visit_func_decl() {
     return true;
 }
 
-// var_decl = type IDENT ";"
-bool visit_var_decl() {
-    fprintf(stderr, "TODO var_decl\n");
-    return false;
+// index = "[" expr "]"
+Expr visit_index() {
+    token_pos++;
+    Expr i = visit_expr();
+    if (!i.ok) return (Expr){};
+    token_pos++;
+    return i;
 }
 
-// program = (var_decl | func_decl)+
+// array_size = "[" INT "]"
+Int visit_array_size() {
+    token_pos++;
+    Int i = visit_int();
+    if (!i.ok) return (Int){};
+    token_pos++;
+    return i;
+}
+
+// var_def = type IDENT index? ("=" expr)? ";"
+bool visit_var_def() {
+    Type type = visit_type();
+    if (!type.ok) return false;
+    Ident name = visit_ident();
+    if (!name.ok) return false;
+
+    int64_t array_size;
+    if (token_buf[token_pos].type == O_BRACKET) {
+        Int size = visit_array_size();
+        if (!size.ok) return false;
+        array_size = size.value;
+    }
+
+    Expr expr = {};
+    if (token_buf[token_pos].type == EQUALS) {
+        token_pos++;
+        expr = visit_expr();
+        if (!expr.ok) return false;
+    }
+
+    if (stack_size == 1) {
+        symbol_add_global(name.span, text_size, true);
+        if (expr.ok) {
+            fprintf(stderr, "TODO global assign\n");
+        }
+    } else {
+        Symbol* symbol = symbol_add_stack(name.span, 8, array_size);
+        if (expr.ok) {
+            asm_mov(symbol->operand, expr.operand);
+        }
+    }
+    token_pos++;
+
+    return true;
+}
+
+// program = (var_def | func_def)+
 bool visit_program() {
     stack_push();
     while (token_pos < token_size) {
         // TODO: dry-parse type to figure out correct offset
         if (token_buf[token_pos + 2].type == O_PAREN || token_buf[token_pos + 3].type == O_PAREN) {
-            bool ok = visit_func_decl();
+            bool ok = visit_func_def();
             if (!ok) return ok;
         } else if (token_buf[token_pos + 2].type == SEMI) {
-            bool ok = visit_var_decl();
+            bool ok = visit_var_def();
             if (!ok) return ok;
         } else {
             fprintf(stderr, "unexpected token when parsing program at %zu: %s\n",

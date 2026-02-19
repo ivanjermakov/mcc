@@ -1,21 +1,20 @@
-program   = (var_decl | func_decl)+
-var_decl  = type IDENT ";"
-func_decl = type IDENT "(" param ("," param)* ")" (";" | block)
-param     = type IDENT
-type      = IDENT "*"?
-block     = "{" statement* "}"
-statement = if | (expr ";") | return | define
-if        = "if" "(" expr ")" block ";"
-call      = IDENT "(" expr ("," expr)* ")"
-return    = "return" expr ";"
-define    = type IDENT ("=" expr)? ";"
-expr      = unary (op unary)*
-unary     = call
-          | IDENT
-          | INT
-          | string
-          | "&" IDENT
-          | "(" expr ")"
-op        = "+" | "-" | "&" | "|" | "^" | "<<" | ">>"
-          | "==" | "!=" | "<" | ">" | "<=" | ">="
-string    = "\"" (STRING_PART | ESCAPE)+ "\""
+program    = (var_def | func_def)+
+var_def    = type IDENT array_size? ("=" expr)? ";"
+array_size = "[" INT "]"
+func_def   = type IDENT "(" param ("," param)* ")" (";" | block)
+param      = type IDENT
+type       = IDENT "*"?
+block      = "{" statement* "}"
+statement  = if | while | (expr ";") | return | var_def
+if         = "if" "(" expr ")" block
+while      = "while" "(" expr ")" block
+return     = "return" expr ";"
+expr       = unary (op_infix unary)*
+unary      = op_prefix* operand op_postfix*
+operand    = IDENT | call | INT | string | "(" expr ")"
+call       = "(" expr ("," expr)* ")"
+op_infix   = "=" "+" | "-" | "&" | "|" | "^" | "<<" | ">>" | "==" | "!=" | "<" | ">" | "<=" | ">="
+op_prefix  = "++" | "--" | "+" | "-" | "&" | "*"
+op_postfix = "++" | "--" | index
+index      = "[" expr "]"
+string     = "\"" (STRING_PART | ESCAPE)+ "\""

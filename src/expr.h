@@ -1,8 +1,10 @@
 #include "core.h"
 #include "emit.h"
 
-Expr visit_unary();
-Operator visit_op();
+Expr visit_operand();
+Operator visit_op_infix();
+Operator visit_op_prefix();
+Operator visit_op_postfix();
 
 typedef struct {
 } ExprTokenOp;
@@ -16,37 +18,55 @@ typedef struct {
 } ExprToken;
 
 /**
+ * expr  = unary (op_infix unary)*
+ * unary = op_prefix* operand op_postfix*
+ *
  * @see https://en.wikipedia.org/wiki/Shunting_yard_algorithm
  */
 bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
     Operator op_stack[1 << 10];
     size_t op_stack_size = 0;
 
+    bool infix_postfix_time = false;
     while (token_buf[token_pos].type != SEMI && token_buf[token_pos].type != COMMA &&
-           token_buf[token_pos].type != C_PAREN) {
+           token_buf[token_pos].type != C_PAREN && token_buf[token_pos].type != C_BRACKET) {
         ExprToken expr_token = {};
-        expr_token.is_operator =
-            token_buf[token_pos].type >= OP_PLUS && token_buf[token_pos].type <= OP_EQUAL;
-        if (expr_token.is_operator) {
-            Operator op = visit_op();
-            if (op == 0) return false;
+        if (infix_postfix_time) {
+            Operator op = visit_op_postfix();
+            if (op.tag == 0) {
+                op = visit_op_infix();
+                if (op.tag == 0) return false;
+                infix_postfix_time = false;
+            }
+            expr_token.is_operator = true;
             expr_token.e.op = op;
-            while (
-                op_stack_size > 0 &&
-                (operator_precedence[op_stack[op_stack_size - 1]] > operator_precedence[op] ||
-                 (operator_associativity[op] == ASSOC_LEFT &&
-                  operator_precedence[op_stack[op_stack_size - 1]] == operator_precedence[op]))) {
+        } else {
+            Operator op = visit_op_prefix();
+            if (op.tag != 0) {
+                expr_token.is_operator = true;
+                expr_token.e.op = op;
+            } else {
+                Expr operand = visit_operand();
+                if (!operand.ok) return false;
+                expr_token.e.operand = operand.operand;
+                expr_stack[(*expr_stack_size)++] = expr_token;
+                infix_postfix_time = true;
+            }
+        }
+
+        if (expr_token.is_operator) {
+            Operator op = expr_token.e.op;
+            while (op_stack_size > 0 && (operator_precedence[op_stack[op_stack_size - 1].tag] >
+                                             operator_precedence[op.tag] ||
+                                         (operator_associativity[op.tag] == ASSOC_LEFT &&
+                                          operator_precedence[op_stack[op_stack_size - 1].tag] ==
+                                              operator_precedence[op.tag]))) {
                 expr_stack[(*expr_stack_size)++] = (ExprToken){
                     .is_operator = true,
-                    .e = {.op = op_stack[--(op_stack_size)]},
+                    .e = {.op = op_stack[--op_stack_size]},
                 };
             }
-            op_stack[(op_stack_size)++] = op;
-        } else {
-            Expr unary = visit_unary();
-            if (!unary.ok) return false;
-            expr_token.e.operand = unary.operand;
-            expr_stack[(*expr_stack_size)++] = expr_token;
+            op_stack[op_stack_size++] = op;
         }
     }
     while (op_stack_size > 0) {
@@ -58,7 +78,7 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
     return true;
 }
 
-// expr = unary (op unary)*
+// expr = unary (op_infix unary)*
 Expr visit_expr() {
     ExprToken expr_stack[1 << 10];
     size_t expr_stack_size = 0;
@@ -78,10 +98,22 @@ Expr visit_expr() {
             assert(eval_stack_size >= 2);
             Operand o1 = eval_stack[eval_stack_size--];
             Operand o2 = eval_stack[eval_stack_size];
-            switch (op) {
+            switch (op.tag) {
                 case OP_ADD: asm_add(o1, o2); break;
+                case OP_LE: {
+                    asm_cmp(o1, o2);
+                    asm_mov(o1, immediate(0));
+                    asm_setle(o1);
+                    break;
+                }
+                case OP_LT: {
+                    asm_cmp(o1, o2);
+                    asm_mov(o1, immediate(0));
+                    asm_setl(o1);
+                    break;
+                }
                 default: {
-                    fprintf(stderr, "TODO binary op\n");
+                    fprintf(stderr, "TODO binary op %d\n", op.tag);
                     return (Expr){};
                 }
             }

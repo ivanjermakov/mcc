@@ -6,7 +6,7 @@ bool is_printable(char c) {
 }
 
 bool is_alpha(char c) {
-    return c >= 'A' && c <= 'z';
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
 bool is_digit(char c) {
@@ -70,9 +70,10 @@ Token next_token() {
     token.span.start = token_offset;
 
     for (size_t i = 0; i < token_literal_size; i++) {
-        if (token_literal[i] == 0) continue;
-        if (strncmp(&input_buf[token_offset], token_literal[i], strlen(token_literal[i])) == 0) {
-            token.span.len = strlen(token_literal[i]);
+        const char* t = token_literal[i];
+        if (t == NULL) continue;
+        if (strncmp(&input_buf[token_offset], t, strlen(t)) == 0) {
+            token.span.len = strlen(t);
             token.type = (TokenType)i;
             token_offset += token.span.len;
             return token;

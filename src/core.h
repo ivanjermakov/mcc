@@ -20,27 +20,36 @@ typedef enum {
     ESCAPE,
     HASH,
     SEMI,
+    QUOTE,
     DQUOTE,
     O_BRACE,
     C_BRACE,
     O_PAREN,
     C_PAREN,
+    O_BRACKET,
+    C_BRACKET,
     COMMA,
     ASTERISK,
     AMPERSAND,
     IF,
+    WHILE,
     RETURN,
-    OP_PLUS,
-    OP_EQUAL,
+    PLUS,
+    EQUALS,
+    O_ANGLE,
+    C_ANGLE,
+    EXCL,
 } TokenType;
 const char* token_literal[] = {
-    0, 0, 0, 0, 0, "#", ";", "\"", "{", "}", "(", ")", ",", "*", "&", "if", "return", "+", "=",
+    NULL, NULL, NULL, NULL, NULL, "#",  ";",     "'",      "\"", "{", "}", "(", ")",
+    "[",  "]",  ",",  "*",  "&",  "if", "while", "return", "+",  "=", "<", ">", "!",
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
-const char* token_name[] = {"NONE",    "IDENT",   "INT",     "STRING_PART", "ESCAPE",
-                            "HASH",    "SEMI",    "DQUOTE",  "O_BRACE",     "C_BRACE",
-                            "O_PAREN", "C_PAREN", "COMMA",   "ASTERISK",    "AMPERSAND",
-                            "IF",      "RETURN",  "OP_PLUS", "OP_EQUAL"};
+const char* token_name[] = {
+    "NONE",      "IDENT",  "INT",      "STRING_PART", "ESCAPE",  "HASH",    "SEMI",
+    "QUOTE",     "DQUOTE", "O_BRACE",  "C_BRACE",     "O_PAREN", "C_PAREN", "O_BRACKET",
+    "C_BRACKET", "COMMA",  "ASTERISK", "AMPERSAND",   "IF",      "WHILE",   "RETURN",
+    "PLUS",      "EQUAL",  "O_ANGLE",  "C_ANGLE",     "EXCL"};
 
 typedef struct {
     Span span;
@@ -104,6 +113,10 @@ typedef struct {
     } o;
 } Operand;
 
+Operand immediate(int64_t value) {
+    return (Operand){.tag = IMMEDIATE, .o = {.immediate = {.value = value}}};
+}
+
 typedef struct {
     bool ok;
     Operand operand;
@@ -111,27 +124,42 @@ typedef struct {
 
 typedef enum {
     OP_ADD = 1,
+    OP_SUB,
+    OP_EQ,
+    OP_NEQ,
+    OP_GT,
+    OP_GE,
+    OP_LT,
+    OP_LE,
+    OP_INDEX,
+    OP_ASSIGN,
+} OperatorTag;
+
+typedef struct {
+    OperatorTag tag;
+    // result of OP_INDEX
+    Operand operand;
 } Operator;
 
 uint8_t operator_precedence[] = {
-    0,
-    1,
+    4, 4, 7, 7, 6, 6, 6, 6, 1, 14,
 };
 
 typedef enum {
-    ASSOC_NONE,
     ASSOC_LEFT,
     ASSOC_RIGHT,
 } Associativity;
 
 uint8_t operator_associativity[] = {
-    ASSOC_NONE,
-    ASSOC_LEFT,
+    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT,
+    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT,
 };
 
 typedef struct {
     Span span;
     Operand operand;
+    size_t size;
+    size_t item_size;
     size_t index;
     ElfSymbolEntry entry;
 } Symbol;

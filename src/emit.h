@@ -85,14 +85,18 @@ void asm_nop() {
     text_buf[text_size++] = 0x90;
 }
 
+void asm_canary(size_t size) {
+    memset(&text_buf[text_size], 0xAA, size);
+    text_size += size;
+}
+
 void asm_lea(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == SYMBOL_LOCAL) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8D;
         text_buf[text_size++] = modrm(0, a.o.reg.i, 5);
         relocation_add_local(PC32, b.o.memory.offset, text_size);
-        memset(&text_buf[text_size], 0xAA, 4);
-        text_size += 4;
+        asm_canary(4);
         return;
     }
     fprintf(stderr, "TODO asm_lea\n");
@@ -171,8 +175,7 @@ void asm_call_global(Symbol* symbol) {
         .type = PLT32,
         .offset = text_size,
     };
-    memset(&text_buf[text_size], 0xAA, 4);
-    text_size += 4;
+    asm_canary(4);
 }
 
 void asm_add(Operand a, Operand b) {
@@ -190,6 +193,27 @@ void asm_add(Operand a, Operand b) {
         return;
     }
     fprintf(stderr, "TODO asm_add\n");
+    asm_nop();
+}
+
+void asm_je(int16_t rel) {
+    text_buf[text_size++] = 0x0F;
+    text_buf[text_size++] = 0x84;
+    text_buf[text_size++] = rel;
+}
+
+void asm_cmp(Operand a, Operand b) {
+    fprintf(stderr, "TODO asm_test\n");
+    asm_nop();
+}
+
+void asm_setle(Operand a) {
+    fprintf(stderr, "TODO asm_setle\n");
+    asm_nop();
+}
+
+void asm_setl(Operand a) {
+    fprintf(stderr, "TODO asm_setl\n");
     asm_nop();
 }
 
