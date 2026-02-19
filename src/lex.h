@@ -20,6 +20,7 @@ bool is_ident(char c, size_t len) {
 Token next_token() {
     Token token = {};
     token.span.start = token_offset;
+    if (token_offset >= input_size) return token;
 
     if (input_buf[token_offset] == '"' && !inside_char) {
         inside_string = !inside_string;

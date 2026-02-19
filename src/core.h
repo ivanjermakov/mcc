@@ -50,7 +50,7 @@ const char* token_name[] = {
     "NONE",      "IDENT",     "INT",    "STRING_PART", "CHAR",      "ESCAPE",  "HASH",
     "SEMI",      "QUOTE",     "DQUOTE", "O_BRACE",     "C_BRACE",   "O_PAREN", "C_PAREN",
     "O_BRACKET", "C_BRACKET", "COMMA",  "ASTERISK",    "AMPERSAND", "IF",      "WHILE",
-    "RETURN",    "PLUS",      "EQUAL",  "O_ANGLE",     "C_ANGLE",   "EXCL"};
+    "RETURN",    "PLUS",      "EQUALS", "O_ANGLE",     "C_ANGLE",   "EXCL"};
 
 typedef struct {
     Span span;
@@ -125,6 +125,12 @@ typedef struct {
 } Expr;
 
 typedef enum {
+    INFIX,
+    PREFIX,
+    POSTFIX,
+} OperatorType;
+
+typedef enum {
     OP_ADD = 1,
     OP_SUB,
     OP_EQ,
@@ -134,17 +140,19 @@ typedef enum {
     OP_LT,
     OP_LE,
     OP_INDEX,
+    OP_INCREMENT,
     OP_ASSIGN,
 } OperatorTag;
 
 typedef struct {
+    OperatorType type;
     OperatorTag tag;
     // result of OP_INDEX
     Operand operand;
 } Operator;
 
 uint8_t operator_precedence[] = {
-    4, 4, 7, 7, 6, 6, 6, 6, 1, 14,
+    4, 4, 7, 7, 6, 6, 6, 6, 1, 2, 14,
 };
 
 typedef enum {
@@ -153,8 +161,8 @@ typedef enum {
 } Associativity;
 
 uint8_t operator_associativity[] = {
-    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT,
-    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT,
+    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT,  ASSOC_LEFT,  ASSOC_LEFT,
+    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT, ASSOC_RIGHT,
 };
 
 typedef struct {

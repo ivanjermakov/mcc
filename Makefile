@@ -33,3 +33,17 @@ inspect_fn:
 	xxd -c 32 build/fn.o
 	readelf -a build/fn.o
 	objdump -d -M intel build/fn.o
+
+compile_ascii: build
+	build/mcc test/ascii.c build/ascii.o
+
+link_ascii: compile_ascii
+	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/ascii.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/ascii
+
+run_ascii: link_ascii
+	build/ascii
+
+inspect_ascii:
+	xxd -c 32 build/ascii.o
+	readelf -a build/ascii.o
+	objdump -d -M intel build/ascii.o

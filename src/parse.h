@@ -182,7 +182,7 @@ Type visit_type() {
 
 // op = "=" | "+" | "-" | "&" | "|" | "^" | "<<" | ">>" | "==" | "!=" | "<" | ">" | "<=" | ">="
 Operator visit_op_infix() {
-    Operator op = {};
+    Operator op = {.type = INFIX};
     switch (token_buf[token_pos].type) {
         case EQUALS: {
             token_pos++;
@@ -231,7 +231,7 @@ Operator visit_op_infix() {
 
 // op_prefix = "++" | "--" | "+" | "-" | "&" | "*"
 Operator visit_op_prefix() {
-    Operator op = {};
+    Operator op = {.type = PREFIX};
     switch (token_buf[token_pos].type) {
         default: {
         }
@@ -241,14 +241,21 @@ Operator visit_op_prefix() {
 
 // op_postfix = "++" | "--" | index
 Operator visit_op_postfix() {
-    Operator op = {};
+    Operator op = {.type = POSTFIX};
     switch (token_buf[token_pos].type) {
         case O_BRACKET: {
             Expr expr = visit_index();
-            if (!expr.ok) return op;
+            if (!expr.ok) break;
             op.tag = OP_INDEX;
             op.operand = expr.operand;
             break;
+        }
+        case PLUS: {
+            if (token_buf[token_pos + 1].type == PLUS) {
+                token_pos += 2;
+                op.tag = OP_INCREMENT;
+                break;
+            }
         }
         default: {
         }
@@ -290,11 +297,6 @@ Expr visit_operand() {
         return expr;
     } else {
         fprintf(stderr, "TODO %s\n", token_name[t.type]);
-        return expr;
-    }
-
-    if (token_buf[token_pos].type == PLUS && token_buf[token_pos + 1].type == PLUS) {
-        fprintf(stderr, "TODO inc\n");
         return expr;
     }
     expr.ok = true;
@@ -388,13 +390,21 @@ bool visit_statement() {
     } else if (token_buf[token_pos].type == RETURN) {
         bool ok = visit_return();
         if (!ok) return false;
-    } else if (token_buf[token_pos + 2].type == SEMI || token_buf[token_pos + 3].type == SEMI ||
-               token_buf[token_pos + 2].type == O_BRACKET ||
-               token_buf[token_pos + 3].type == O_BRACKET ||
-               token_buf[token_pos + 2].type == EQUALS || token_buf[token_pos + 3].type == EQUALS) {
-        bool ok = visit_var_def();
-        if (!ok) return false;
     } else {
+        size_t token_pos_old = token_pos;
+        if (visit_type().ok) {
+            if (visit_ident().ok) {
+                if (token_buf[token_pos].type == SEMI || token_buf[token_pos].type == EQUALS ||
+                    token_buf[token_pos].type == O_BRACKET) {
+                    token_pos = token_pos_old;
+                    bool ok = visit_var_def();
+                    if (!ok) return false;
+                    return true;
+                }
+            }
+        }
+        token_pos = token_pos_old;
+
         Expr expr = visit_expr();
         if (!expr.ok) return expr.ok;
         token_pos++;
@@ -513,7 +523,7 @@ Int visit_array_size() {
     return i;
 }
 
-// var_def = type IDENT index? ("=" expr)? ";"
+// var_def = type IDENT array_size? ("=" expr)? ";"
 bool visit_var_def() {
     Type type = visit_type();
     if (!type.ok) return false;

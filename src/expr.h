@@ -95,26 +95,67 @@ Expr visit_expr() {
     while (expr_pos < expr_stack_size) {
         if (expr_stack[expr_pos].is_operator) {
             Operator op = expr_stack[expr_pos++].e.op;
-            assert(eval_stack_size >= 2);
-            Operand o1 = eval_stack[eval_stack_size--];
-            Operand o2 = eval_stack[eval_stack_size];
-            switch (op.tag) {
-                case OP_ADD: asm_add(o1, o2); break;
-                case OP_LE: {
-                    asm_cmp(o1, o2);
-                    asm_mov(o1, immediate(0));
-                    asm_setle(o1);
-                    break;
+            if (op.type == INFIX) {
+                assert(eval_stack_size >= 2);
+                Operand o1 = eval_stack[eval_stack_size--];
+                Operand o2 = eval_stack[eval_stack_size];
+                switch (op.tag) {
+                    case OP_ADD: {
+                        asm_add(o1, o2);
+                        break;
+                    }
+                    case OP_LE: {
+                        asm_cmp(o1, o2);
+                        asm_mov(o1, immediate(0));
+                        asm_setle(o1);
+                        break;
+                    }
+                    case OP_LT: {
+                        asm_cmp(o1, o2);
+                        asm_mov(o1, immediate(0));
+                        asm_setl(o1);
+                        break;
+                    }
+                    case OP_ASSIGN: {
+                        asm_mov(o1, o2);
+                        break;
+                    }
+                    default: {
+                        fprintf(stderr, "TODO binary op %d\n", op.tag);
+                        return (Expr){};
+                    }
                 }
-                case OP_LT: {
-                    asm_cmp(o1, o2);
-                    asm_mov(o1, immediate(0));
-                    asm_setl(o1);
-                    break;
-                }
-                default: {
-                    fprintf(stderr, "TODO binary op %d\n", op.tag);
-                    return (Expr){};
+            } else if (op.type == PREFIX) {
+                fprintf(stderr, "TODO prefix op %d\n", op.tag);
+                return (Expr){};
+            } else {
+                Operand o = eval_stack[eval_stack_size];
+                switch (op.tag) {
+                    case OP_INDEX: {
+                        Operand idx = op.operand;
+                        {
+                            Operand ptr = expr_registers[expr_registers_busy++];
+                            asm_lea(ptr, o);
+                            asm_add(ptr, idx);
+                            asm_mov(o, ptr);
+                            expr_registers_busy--;
+                        }
+                        goto c;
+                    }
+                    case OP_INCREMENT: {
+                        {
+                            Operand tmp = expr_registers[expr_registers_busy++];
+                            asm_mov(tmp, o);
+                            asm_add(tmp, immediate(1));
+                            asm_mov(o, tmp);
+                            expr_registers_busy--;
+                        }
+                        goto c;
+                    }
+                    default: {
+                        fprintf(stderr, "TODO postfix op %d\n", op.tag);
+                        return (Expr){};
+                    }
                 }
             }
         } else {
@@ -126,6 +167,7 @@ Expr visit_expr() {
                 eval_stack[eval_stack_size++] = o;
             }
         }
+    c:;
     }
 
     Expr res = {.ok = true};
