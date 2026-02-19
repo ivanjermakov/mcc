@@ -2,7 +2,7 @@
 #include "core.h"
 
 bool is_printable(char c) {
-    return c >= 32 && c <= 127;
+    return c >= 32 && c <= 126;
 }
 
 bool is_alpha(char c) {
@@ -21,15 +21,21 @@ Token next_token() {
     Token token = {};
     token.span.start = token_offset;
 
-    if (input_buf[token_offset] == '"') {
+    if (input_buf[token_offset] == '"' && !inside_char) {
         inside_string = !inside_string;
         token.span.len = 1;
         token.type = DQUOTE;
         token_offset += token.span.len;
         return token;
     }
-    if (inside_string) {
-        size_t str_len = 0;
+    if (input_buf[token_offset] == '\'' && !inside_string) {
+        inside_char = !inside_char;
+        token.span.len = 1;
+        token.type = QUOTE;
+        token_offset += token.span.len;
+        return token;
+    }
+    if (inside_string || inside_char) {
         if (input_buf[token_offset] == '\\') {
             // TODO: wrap str_len++ into advance() to check for EOF
             uint8_t c = input_buf[token_offset];
@@ -42,6 +48,9 @@ Token next_token() {
             token_offset += token.span.len;
             return token;
         }
+    }
+    if (inside_string) {
+        size_t str_len = 0;
         while (token_offset < input_size) {
             if (input_buf[token_offset + str_len] == '"' ||
                 input_buf[token_offset + str_len] == '\\') {
@@ -55,6 +64,13 @@ Token next_token() {
         fprintf(stderr, "non-terminated string at %zu\n", token_offset);
         return token;
     }
+    if (inside_char) {
+        token.span.len = 1;
+        token.type = CHAR;
+        token_offset += token.span.len;
+        return token;
+    }
+
     if (input_buf[token_offset] == '/' && input_buf[token_offset + 1] == '/') {
         while (token_offset < input_size && input_buf[token_offset] != '\n') {
             token_offset++;
@@ -62,12 +78,13 @@ Token next_token() {
         return next_token();
     }
 
-    while (token_offset < input_size &&
-           (!is_printable(input_buf[token_offset]) || input_buf[token_offset] == ' ')) {
-        token_offset++;
+    size_t skip = 0;
+    if (token_offset < input_size &&
+        (!is_printable(input_buf[token_offset]) || input_buf[token_offset] == ' ')) {
+        skip++;
     }
-    if (token_offset >= input_size) return token;
-    token.span.start = token_offset;
+    token_offset += skip;
+    if (skip > 0) return next_token();
 
     for (size_t i = 0; i < token_literal_size; i++) {
         const char* t = token_literal[i];

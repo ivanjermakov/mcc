@@ -13,7 +13,7 @@ int32_t main(int32_t argc, char* argv[]) {
     fclose(source_file);
 
     Token token;
-    while (true) {
+    while (token_offset < input_size) {
         token = next_token();
         if (token.type == NONE) break;
         token_buf[token_size++] = token;

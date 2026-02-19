@@ -79,12 +79,8 @@ Int visit_int() {
 }
 
 // string = "\"" (STRING_PART | ESCAPE_SEQ)+ "\""
-typedef struct {
-    bool ok;
-    Operand operand;
-} String;
-String visit_string() {
-    String string = {};
+Expr visit_string() {
+    Expr string = {};
 
     token_pos++;
     uint8_t str_buf[1 << 10] = {0};
@@ -142,6 +138,17 @@ String visit_string() {
 
     string.ok = true;
     return string;
+}
+
+Expr visit_char() {
+    Expr c = {};
+    token_pos++;
+    // TODO: escape
+    c.operand = immediate(input_buf[token_buf[token_pos].span.start]);
+    token_pos++;
+    token_pos++;
+    c.ok = true;
+    return c;
 }
 
 typedef struct {
@@ -249,7 +256,7 @@ Operator visit_op_postfix() {
     return op;
 }
 
-// operand = IDENT | call | INT | string | "(" expr ")"
+// operand = IDENT | call | INT | string | char | "(" expr ")"
 Expr visit_operand() {
     Expr expr = {};
     Token t = token_buf[token_pos];
@@ -268,9 +275,13 @@ Expr visit_operand() {
         if (!i.ok) return expr;
         expr.operand = immediate(i.value);
     } else if (t.type == DQUOTE) {
-        String string = visit_string();
+        Expr string = visit_string();
         if (!string.ok) return expr;
         expr.operand = string.operand;
+    } else if (t.type == QUOTE) {
+        Expr c = visit_char();
+        if (!c.ok) return expr;
+        expr.operand = c.operand;
     } else if (t.type == AMPERSAND) {
         fprintf(stderr, "TODO %s\n", token_name[t.type]);
         return expr;

@@ -11,10 +11,11 @@ while      = "while" "(" expr ")" block
 return     = "return" expr ";"
 expr       = unary (op_infix unary)*
 unary      = op_prefix* operand op_postfix*
-operand    = IDENT | call | INT | string | "(" expr ")"
+operand    = IDENT | call | INT | string | char | "(" expr ")"
 call       = "(" expr ("," expr)* ")"
 op_infix   = "=" "+" | "-" | "&" | "|" | "^" | "<<" | ">>" | "==" | "!=" | "<" | ">" | "<=" | ">="
 op_prefix  = "++" | "--" | "+" | "-" | "&" | "*"
 op_postfix = "++" | "--" | index
 index      = "[" expr "]"
 string     = "\"" (STRING_PART | ESCAPE)+ "\""
+char       = "'" (CHAR | ESCAPE) "'"

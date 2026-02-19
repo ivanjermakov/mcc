@@ -17,6 +17,7 @@ typedef enum {
     IDENT,
     INT,
     STRING_PART,
+    CHAR,
     ESCAPE,
     HASH,
     SEMI,
@@ -41,15 +42,15 @@ typedef enum {
     EXCL,
 } TokenType;
 const char* token_literal[] = {
-    NULL, NULL, NULL, NULL, NULL, "#",  ";",     "'",      "\"", "{", "}", "(", ")",
-    "[",  "]",  ",",  "*",  "&",  "if", "while", "return", "+",  "=", "<", ">", "!",
+    NULL, NULL, NULL, NULL, NULL, NULL, "#",     ";",      "'", "\"", "{", "}", "(", ")",
+    "[",  "]",  ",",  "*",  "&",  "if", "while", "return", "+", "=",  "<", ">", "!",
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
 const char* token_name[] = {
-    "NONE",      "IDENT",  "INT",      "STRING_PART", "ESCAPE",  "HASH",    "SEMI",
-    "QUOTE",     "DQUOTE", "O_BRACE",  "C_BRACE",     "O_PAREN", "C_PAREN", "O_BRACKET",
-    "C_BRACKET", "COMMA",  "ASTERISK", "AMPERSAND",   "IF",      "WHILE",   "RETURN",
-    "PLUS",      "EQUAL",  "O_ANGLE",  "C_ANGLE",     "EXCL"};
+    "NONE",      "IDENT",     "INT",    "STRING_PART", "CHAR",      "ESCAPE",  "HASH",
+    "SEMI",      "QUOTE",     "DQUOTE", "O_BRACE",     "C_BRACE",   "O_PAREN", "C_PAREN",
+    "O_BRACKET", "C_BRACKET", "COMMA",  "ASTERISK",    "AMPERSAND", "IF",      "WHILE",
+    "RETURN",    "PLUS",      "EQUAL",  "O_ANGLE",     "C_ANGLE",   "EXCL"};
 
 typedef struct {
     Span span;
@@ -61,6 +62,7 @@ size_t token_size = 0;
 size_t token_offset = 0;
 
 bool inside_string = false;
+bool inside_char = false;
 
 char input_buf[1 << 10];
 size_t input_size = 0;
