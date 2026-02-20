@@ -91,15 +91,27 @@ void asm_canary(size_t size) {
 }
 
 void asm_lea(Operand a, Operand b) {
+    if (a.tag == REGISTER && b.tag == REGISTER) {
+        fprintf(stderr, "asm_lea _ r\n");
+        assert(false);
+        return;
+    }
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == SYMBOL_LOCAL) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8D;
-        text_buf[text_size++] = modrm(0, a.o.reg.i, 5);
+        text_buf[text_size++] = modrm(0, a.o.reg.i, RM_DI);
         relocation_add_local(PC32, b.o.memory.offset, text_size);
         asm_canary(4);
         return;
     }
-    fprintf(stderr, "TODO asm_lea\n");
+    if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x8D;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.o.reg.i, RM_DI);
+        text_buf[text_size++] = (uint8_t)b.o.memory.offset;
+        return;
+    }
+    fprintf(stderr, "TODO asm_lea %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
@@ -122,6 +134,10 @@ void asm_mov(Operand a, Operand b) {
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
+        if (b.o.memory.pointer) {
+            asm_lea(a, b);
+            return;
+        }
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8B;
         text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.o.reg.i, RM_DI);
@@ -135,14 +151,20 @@ void asm_mov(Operand a, Operand b) {
         text_buf[text_size++] = (uint8_t)a.o.memory.offset;
         return;
     }
+    if (a.tag == MEMORY && a.o.memory.mode == REL_RBP && b.tag == IMMEDIATE) {
+        Operand tmp = expr_registers[expr_registers_busy];
+        asm_mov(tmp, b);
+        asm_mov(a, tmp);
+        return;
+    }
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
         text_buf[text_size++] = 0x48;
-        text_buf[text_size++] = 0x8b;
+        text_buf[text_size++] = 0x8B;
         text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.o.reg.i, RM_DI);
         text_buf[text_size++] = (uint8_t)b.o.memory.offset;
         return;
     }
-    fprintf(stderr, "TODO asm_mov\n");
+    fprintf(stderr, "TODO asm_mov %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
@@ -182,7 +204,13 @@ void asm_add(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x03;
-        text_buf[text_size++] = modrm(MOD_REGISTER, b.o.reg.i, a.o.reg.i);
+        text_buf[text_size++] = modrm(MOD_REGISTER, a.o.reg.i, b.o.reg.i);
+        return;
+    }
+    if (a.tag == REGISTER && b.tag == IMMEDIATE) {
+        Operand tmp = expr_registers[expr_registers_busy];
+        asm_mov(tmp, b);
+        asm_add(a, tmp);
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
@@ -192,7 +220,7 @@ void asm_add(Operand a, Operand b) {
         text_buf[text_size++] = (uint8_t)b.o.memory.offset;
         return;
     }
-    fprintf(stderr, "TODO asm_add\n");
+    fprintf(stderr, "TODO asm_add %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
@@ -202,18 +230,47 @@ void asm_je(int16_t rel) {
     text_buf[text_size++] = rel;
 }
 
+void asm_jmp(int16_t rel) {
+    fprintf(stderr, "TODO asm_jmp\n");
+    asm_nop();
+}
+
 void asm_cmp(Operand a, Operand b) {
-    fprintf(stderr, "TODO asm_test\n");
+    if (a.tag == REGISTER && b.tag == REGISTER) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x3B;
+        text_buf[text_size++] = modrm(MOD_REGISTER, b.o.reg.i, a.o.reg.i);
+        return;
+    }
+    if (a.tag == REGISTER) {
+        Operand tmp = expr_registers[expr_registers_busy];
+        asm_mov(tmp, b);
+        asm_cmp(a, tmp);
+        return;
+    }
+    fprintf(stderr, "TODO asm_cmp %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
 void asm_setle(Operand a) {
-    fprintf(stderr, "TODO asm_setle\n");
+    if (a.tag == REGISTER) {
+        text_buf[text_size++] = 0x0F;
+        text_buf[text_size++] = 0x9E;
+        text_buf[text_size++] = modrm(MOD_REGISTER, a.o.reg.i, RM_DI);
+        return;
+    }
+    fprintf(stderr, "TODO asm_setle %d\n", a.tag);
     asm_nop();
 }
 
 void asm_setl(Operand a) {
-    fprintf(stderr, "TODO asm_setl\n");
+    if (a.tag == REGISTER) {
+        text_buf[text_size++] = 0x0F;
+        text_buf[text_size++] = 0x9C;
+        text_buf[text_size++] = modrm(MOD_REGISTER, a.o.reg.i, RM_DI);
+        return;
+    }
+    fprintf(stderr, "TODO asm_setl %d\n", a.tag);
     asm_nop();
 }
 

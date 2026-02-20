@@ -104,6 +104,7 @@ typedef enum {
 typedef struct {
     AddressingMode mode;
     int64_t offset;
+    bool pointer;
 } OperandMemory;
 
 typedef struct {

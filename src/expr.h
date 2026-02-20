@@ -117,7 +117,7 @@ Expr visit_expr() {
                         break;
                     }
                     case OP_ASSIGN: {
-                        asm_mov(o1, o2);
+                        asm_mov(o2, o1);
                         break;
                     }
                     default: {
@@ -135,8 +135,9 @@ Expr visit_expr() {
                         Operand idx = op.operand;
                         {
                             Operand ptr = expr_registers[expr_registers_busy++];
-                            asm_lea(ptr, o);
+                            asm_mov(ptr, o);
                             asm_add(ptr, idx);
+                            asm_nop();
                             asm_mov(o, ptr);
                             expr_registers_busy--;
                         }
