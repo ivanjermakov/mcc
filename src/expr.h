@@ -86,7 +86,6 @@ Expr visit_expr() {
 
     bool ok = shunting_yard(expr_stack, &expr_stack_size);
     if (!ok) return (Expr){};
-    bool need_tmp_register = expr_stack_size > 1;
 
     assert(expr_stack_size > 0);
     size_t expr_pos = 0;
@@ -97,8 +96,9 @@ Expr visit_expr() {
             Operator op = expr_stack[expr_pos++].e.op;
             if (op.type == INFIX) {
                 assert(eval_stack_size >= 2);
-                Operand o1 = eval_stack[eval_stack_size--];
-                Operand o2 = eval_stack[eval_stack_size];
+                Operand o2 = eval_stack[eval_stack_size - 1];
+                eval_stack_size--;
+                Operand o1 = eval_stack[eval_stack_size - 1];
                 switch (op.tag) {
                     case OP_ADD: {
                         asm_add(o1, o2);
@@ -117,7 +117,11 @@ Expr visit_expr() {
                         break;
                     }
                     case OP_ASSIGN: {
-                        asm_mov(o2, o1);
+                        if (o1.lvalue.size == 0) {
+                            fprintf(stderr, "Not an lvalue\n");
+                            return (Expr){};
+                        }
+                        asm_mov((Operand){.tag = REGISTER, .o = {.reg = o1.lvalue}}, o2);
                         break;
                     }
                     default: {
@@ -129,26 +133,30 @@ Expr visit_expr() {
                 fprintf(stderr, "TODO prefix op %d\n", op.tag);
                 return (Expr){};
             } else {
-                Operand o = eval_stack[eval_stack_size];
+                Operand* o = &eval_stack[eval_stack_size - 1];
                 switch (op.tag) {
                     case OP_INDEX: {
                         Operand idx = op.operand;
                         {
                             Operand ptr = expr_registers[expr_registers_busy++];
-                            asm_mov(ptr, o);
-                            asm_add(ptr, idx);
-                            asm_nop();
-                            asm_mov(o, ptr);
-                            expr_registers_busy--;
+                            asm_mov(ptr, idx);
+                            asm_add(ptr, *o);
+
+                            Operand res = expr_registers[expr_registers_busy++];
+                            ptr.o.reg.indirect = true;
+                            asm_mov(res, ptr);
+
+                            *o = res;
+                            o->lvalue = ptr.o.reg;
                         }
                         goto c;
                     }
                     case OP_INCREMENT: {
                         {
                             Operand tmp = expr_registers[expr_registers_busy++];
-                            asm_mov(tmp, o);
+                            asm_mov(tmp, *o);
                             asm_add(tmp, immediate(1));
-                            asm_mov(o, tmp);
+                            asm_mov(*o, tmp);
                             expr_registers_busy--;
                         }
                         goto c;
@@ -161,23 +169,13 @@ Expr visit_expr() {
             }
         } else {
             Operand o = expr_stack[expr_pos++].e.operand;
-            if (eval_stack_size == 0 && need_tmp_register) {
-                asm_mov(expr_registers[expr_registers_busy++], o);
-                eval_stack[eval_stack_size++] = expr_registers[expr_registers_busy];
-            } else {
-                eval_stack[eval_stack_size++] = o;
-            }
+            eval_stack[eval_stack_size++] = o;
         }
     c:;
     }
 
     Expr res = {.ok = true};
-    if (need_tmp_register) {
-        expr_registers_busy--;
-        res.operand = expr_registers[expr_registers_busy];
-    } else {
-        res.operand = eval_stack[0];
-    }
-    assert(expr_registers_busy_pre == expr_registers_busy);
+    expr_registers_busy = expr_registers_busy_pre;
+    res.operand = eval_stack[expr_registers_busy];
     return res;
 }

@@ -74,10 +74,8 @@ typedef enum {
     MOD_REGISTER = 0b11
 } ModrmMod;
 
-uint8_t modrm(ModrmMod mod, uint8_t reg, uint8_t rm) {
-    assert(mod < 4);
+uint8_t modrm(ModrmMod mod, uint8_t reg, ModrmRm rm) {
     assert(reg < 8);
-    assert(rm < 8);
     return (uint8_t)((mod << 6) | (reg << 3) | rm);
 }
 
@@ -116,13 +114,36 @@ void asm_lea(Operand a, Operand b) {
 }
 
 void asm_mov(Operand a, Operand b) {
+    if (a.tag == IMMEDIATE) {
+        fprintf(stderr, "asm_lea mov _\n");
+        assert(false);
+        return;
+    }
     if (a.tag == REGISTER && b.tag == REGISTER) {
+        if (a.o.reg.i == b.o.reg.i && a.o.reg.indirect == false && b.o.reg.indirect == false)
+            return;
         text_buf[text_size++] = 0x48;
+        if (a.o.reg.indirect) {
+            text_buf[text_size++] = 0x89;
+            text_buf[text_size++] = modrm(MOD_INDIRECT, b.o.reg.i, a.o.reg.i);
+            return;
+        }
+        if (b.o.reg.indirect) {
+            text_buf[text_size++] = 0x8B;
+            text_buf[text_size++] = modrm(MOD_INDIRECT, a.o.reg.i, b.o.reg.i);
+            return;
+        }
         text_buf[text_size++] = 0x89;
         text_buf[text_size++] = modrm(MOD_REGISTER, b.o.reg.i, a.o.reg.i);
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
+        if (a.o.reg.indirect) {
+            Operand tmp = expr_registers[expr_registers_busy];
+            asm_mov(tmp, b);
+            asm_mov(a, tmp);
+            return;
+        }
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0xB8 + a.o.reg.i;
         memcpy(&text_buf[text_size], &b.o.immediate.value, 8);
@@ -134,10 +155,6 @@ void asm_mov(Operand a, Operand b) {
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.o.memory.mode == REL_RBP) {
-        if (b.o.memory.pointer) {
-            asm_lea(a, b);
-            return;
-        }
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x8B;
         text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.o.reg.i, RM_DI);

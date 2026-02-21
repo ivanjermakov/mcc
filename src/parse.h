@@ -40,7 +40,7 @@ Symbol* symbol_add_stack(Span name_span, size_t size, size_t count) {
     scope->bp_offset -= size;
     Operand operand = {
         .tag = MEMORY,
-        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset, .pointer = count > 0}},
+        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset}},
     };
     symbols_buf[symbols_size++] = (Symbol){
         .span = name_span,
@@ -131,7 +131,7 @@ Expr visit_string() {
     size_t symbol_idx = symbol_add_rodata(symbol_name_buf, symbol_name_size, rodata_size, str_len);
     string.operand = (Operand){
         .tag = MEMORY,
-        .o = {.memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx, .pointer = true}},
+        .o = {.memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx}},
     };
     memcpy(&rodata_buf[rodata_size], &str_buf, str_len);
     rodata_size += str_len + 1;
@@ -276,7 +276,13 @@ Expr visit_operand() {
         if (!ident.ok) return expr;
         Symbol* symbol = symbol_find(ident.span);
         if (symbol == NULL) return expr;
-        expr.operand = symbol->operand;
+        if (symbol->size > 0) {
+            Operand tmp = expr_registers[expr_registers_busy++];
+            asm_lea(tmp, symbol->operand);
+            expr.operand = tmp;
+        } else {
+            expr.operand = symbol->operand;
+        }
     } else if (t.type == INT) {
         Int i = visit_int();
         if (!i.ok) return expr;

@@ -80,7 +80,7 @@ ElfSymbolEntry symbols_local_buf[1 << 10];
 size_t symbols_local_size = 1;
 
 typedef enum {
-    REGISTER,
+    REGISTER = 1,
     IMMEDIATE,
     MEMORY,
 } OperandTag;
@@ -88,6 +88,8 @@ typedef enum {
 typedef struct {
     uint8_t i;
     uint8_t size;
+    // in asm instructions, register is treated as effective address
+    bool indirect;
 } OperandRegister;
 
 typedef struct {
@@ -104,7 +106,6 @@ typedef enum {
 typedef struct {
     AddressingMode mode;
     int64_t offset;
-    bool pointer;
 } OperandMemory;
 
 typedef struct {
@@ -114,6 +115,8 @@ typedef struct {
         OperandImmediate immediate;
         OperandMemory memory;
     } o;
+    // in case operand is used in lvalue context, use this instead of `o`
+    OperandRegister lvalue;
 } Operand;
 
 Operand immediate(int64_t value) {
