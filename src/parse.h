@@ -40,7 +40,7 @@ Symbol* symbol_add_stack(Span name_span, size_t size, size_t count) {
     scope->bp_offset -= size;
     Operand operand = {
         .tag = MEMORY,
-        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset}},
+        .memory = {.mode = REL_RBP, .offset = scope->bp_offset},
     };
     symbols_buf[symbols_size++] = (Symbol){
         .span = name_span,
@@ -131,7 +131,7 @@ Expr visit_string() {
     size_t symbol_idx = symbol_add_rodata(symbol_name_buf, symbol_name_size, rodata_size, str_len);
     string.operand = (Operand){
         .tag = MEMORY,
-        .o = {.memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx}},
+        .memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx},
     };
     memcpy(&rodata_buf[rodata_size], &str_buf, str_len);
     rodata_size += str_len + 1;
@@ -450,7 +450,7 @@ Param visit_param(size_t param_index) {
     scope->bp_offset -= 8;
     param.operand = (Operand){
         .tag = MEMORY,
-        .o = {.memory = {.mode = REL_RBP, .offset = scope->bp_offset}},
+        .memory = {.mode = REL_RBP, .offset = scope->bp_offset},
     };
     symbols_buf[symbols_size++] = (Symbol){
         .span = param.name.span,

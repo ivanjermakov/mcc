@@ -14,7 +14,7 @@ typedef struct {
     union {
         Operator op;
         Operand operand;
-    } e;
+    };
 } ExprToken;
 
 /**
@@ -39,23 +39,23 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
                 infix_postfix_time = false;
             }
             expr_token.is_operator = true;
-            expr_token.e.op = op;
+            expr_token.op = op;
         } else {
             Operator op = visit_op_prefix();
             if (op.tag != 0) {
                 expr_token.is_operator = true;
-                expr_token.e.op = op;
+                expr_token.op = op;
             } else {
                 Expr operand = visit_operand();
                 if (!operand.ok) return false;
-                expr_token.e.operand = operand.operand;
+                expr_token.operand = operand.operand;
                 expr_stack[(*expr_stack_size)++] = expr_token;
                 infix_postfix_time = true;
             }
         }
 
         if (expr_token.is_operator) {
-            Operator op = expr_token.e.op;
+            Operator op = expr_token.op;
             while (op_stack_size > 0 && (operator_precedence[op_stack[op_stack_size - 1].tag] >
                                              operator_precedence[op.tag] ||
                                          (operator_associativity[op.tag] == ASSOC_LEFT &&
@@ -63,7 +63,7 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
                                               operator_precedence[op.tag]))) {
                 expr_stack[(*expr_stack_size)++] = (ExprToken){
                     .is_operator = true,
-                    .e = {.op = op_stack[--op_stack_size]},
+                    .op = op_stack[--op_stack_size],
                 };
             }
             op_stack[op_stack_size++] = op;
@@ -72,7 +72,7 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
     while (op_stack_size > 0) {
         expr_stack[(*expr_stack_size)++] = (ExprToken){
             .is_operator = true,
-            .e = {.op = op_stack[--op_stack_size]},
+            .op = op_stack[--op_stack_size],
         };
     }
     return true;
@@ -93,7 +93,7 @@ Expr visit_expr() {
     size_t eval_stack_size = 0;
     while (expr_pos < expr_stack_size) {
         if (expr_stack[expr_pos].is_operator) {
-            Operator op = expr_stack[expr_pos++].e.op;
+            Operator op = expr_stack[expr_pos++].op;
             if (op.type == INFIX) {
                 assert(eval_stack_size >= 2);
                 Operand o2 = eval_stack[eval_stack_size - 1];
@@ -121,7 +121,7 @@ Expr visit_expr() {
                             fprintf(stderr, "Not an lvalue\n");
                             return (Expr){};
                         }
-                        asm_mov((Operand){.tag = REGISTER, .o = {.reg = o1.lvalue}}, o2);
+                        asm_mov((Operand){.tag = REGISTER, .reg = o1.lvalue}, o2);
                         break;
                     }
                     default: {
@@ -143,11 +143,11 @@ Expr visit_expr() {
                             asm_add(ptr, *o);
 
                             Operand res = expr_registers[expr_registers_busy++];
-                            ptr.o.reg.indirect = true;
+                            ptr.reg.indirect = true;
                             asm_mov(res, ptr);
 
                             *o = res;
-                            o->lvalue = ptr.o.reg;
+                            o->lvalue = ptr.reg;
                         }
                         goto c;
                     }
@@ -168,7 +168,7 @@ Expr visit_expr() {
                 }
             }
         } else {
-            Operand o = expr_stack[expr_pos++].e.operand;
+            Operand o = expr_stack[expr_pos++].operand;
             eval_stack[eval_stack_size++] = o;
         }
     c:;
