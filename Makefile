@@ -16,8 +16,6 @@ run_hello: link_hello
 	build/hello
 
 inspect_hello:
-	xxd -c 32 build/hello.o
-	readelf -a build/hello.o
 	objdump -d -M intel build/hello.o
 
 compile_fn: build
@@ -30,8 +28,6 @@ run_fn: link_fn
 	build/fn
 
 inspect_fn:
-	xxd -c 32 build/fn.o
-	readelf -a build/fn.o
 	objdump -d -M intel build/fn.o
 
 compile_ascii: build
@@ -44,6 +40,4 @@ run_ascii: link_ascii
 	build/ascii
 
 inspect_ascii:
-	xxd -c 32 build/ascii.o
-	readelf -a build/ascii.o
 	objdump -d -M intel build/ascii.o
