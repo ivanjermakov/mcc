@@ -98,30 +98,33 @@ Expr visit_expr() {
                 assert(eval_stack_size >= 2);
                 Operand o2 = eval_stack[eval_stack_size - 1];
                 eval_stack_size--;
-                Operand o1 = eval_stack[eval_stack_size - 1];
+                Operand* o1 = &eval_stack[eval_stack_size - 1];
                 switch (op.tag) {
                     case OP_ADD: {
-                        asm_add(o1, o2);
+                        Operand tmp = expr_registers[expr_registers_busy++];
+                        asm_mov(tmp, o2);
+                        asm_add(tmp, *o1);
+                        *o1 = tmp;
                         break;
                     }
                     case OP_LE: {
-                        asm_cmp(o1, o2);
-                        asm_mov(o1, immediate(0));
-                        asm_setle(o1);
+                        asm_cmp(*o1, o2);
+                        asm_mov(*o1, immediate(0));
+                        asm_setle(*o1);
                         break;
                     }
                     case OP_LT: {
-                        asm_cmp(o1, o2);
-                        asm_mov(o1, immediate(0));
-                        asm_setl(o1);
+                        asm_cmp(*o1, o2);
+                        asm_mov(*o1, immediate(0));
+                        asm_setl(*o1);
                         break;
                     }
                     case OP_ASSIGN: {
-                        if (o1.lvalue.size == 0) {
+                        if (o1->lvalue.size == 0) {
                             fprintf(stderr, "Not an lvalue\n");
                             return (Expr){};
                         }
-                        asm_mov((Operand){.tag = REGISTER, .reg = o1.lvalue}, o2);
+                        asm_mov((Operand){.tag = REGISTER, .reg = o1->lvalue}, o2);
                         break;
                     }
                     default: {

@@ -223,7 +223,7 @@ void asm_add(Operand a, Operand b) {
         text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, b.reg.i);
         return;
     }
-    if (a.tag == REGISTER && b.tag == IMMEDIATE) {
+    if ((a.tag == REGISTER && b.tag == IMMEDIATE) || (a.tag == MEMORY && b.tag == MEMORY)) {
         Operand tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, b);
         asm_add(a, tmp);
@@ -233,6 +233,13 @@ void asm_add(Operand a, Operand b) {
         text_buf[text_size++] = 0x48;
         text_buf[text_size++] = 0x03;
         text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.reg.i, RM_DI);
+        text_buf[text_size++] = (uint8_t)b.memory.offset;
+        return;
+    }
+    if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {
+        text_buf[text_size++] = 0x48;
+        text_buf[text_size++] = 0x01;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, b.reg.i, RM_DI);
         text_buf[text_size++] = (uint8_t)b.memory.offset;
         return;
     }
