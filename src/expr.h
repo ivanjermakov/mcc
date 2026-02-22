@@ -178,7 +178,7 @@ Expr visit_expr() {
     }
 
     Expr res = {.ok = true};
+    res.operand = eval_stack[0];
     expr_registers_busy = expr_registers_busy_pre;
-    res.operand = eval_stack[expr_registers_busy];
     return res;
 }
