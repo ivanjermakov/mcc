@@ -477,6 +477,9 @@ bool visit_func_def() {
     }
     token_pos++;
 
+    // TODO: compute
+    size_t stack_alloc = 0xFF;
+
     if (token_buf[token_pos].type == SEMI) {
         symbol_add_global(name.span, symbol_pos, false);
         token_pos++;
@@ -486,6 +489,7 @@ bool visit_func_def() {
 
         asm_push(RBP);
         asm_mov(RBP, RSP);
+        asm_sub(RSP, immediate(stack_alloc));
 
         token_pos = param_token_pos;
         token_pos++;
@@ -501,6 +505,10 @@ bool visit_func_def() {
         bool ok = visit_block();
         if (!ok) return ok;
 
+        // preserve RAX
+        expr_registers_busy++;
+        asm_add(RSP, immediate(stack_alloc));
+        expr_registers_busy--;
         asm_pop(RBP);
         asm_ret();
 
