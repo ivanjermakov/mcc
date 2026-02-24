@@ -492,7 +492,10 @@ bool visit_func_def() {
         symbol_add_global(name.span, symbol_pos, true);
         stack_push();
 
-        asm_push(RBP);
+        // TODO: only preserve used registers
+        for (size_t i = 0; i < non_volatile_registers_size; i++) {
+            asm_push(non_volatile_registers[i]);
+        }
         asm_mov(RBP, RSP);
         asm_sub(RSP, immediate(stack_alloc));
 
@@ -514,7 +517,11 @@ bool visit_func_def() {
         expr_registers_busy++;
         asm_add(RSP, immediate(stack_alloc));
         expr_registers_busy--;
-        asm_pop(RBP);
+
+        // TODO: only preserve used registers
+        for (size_t i = 1; i <= non_volatile_registers_size; i++) {
+            asm_pop(non_volatile_registers[non_volatile_registers_size - i]);
+        }
         asm_ret();
 
         stack_pop();
