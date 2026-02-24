@@ -317,24 +317,26 @@ bool visit_if() {
 
 // while = "while" "(" expr ")" block
 bool visit_while() {
+    int32_t loop_pos = text_size;
+
     token_pos += 2;
     Expr expr = visit_expr();
     if (!expr.ok) return false;
     token_pos++;
 
-    size_t loop_pos = text_size;
     asm_cmp(expr.operand, immediate(0));
     size_t je_pos = text_size;
-    asm_canary(3);
+    asm_canary(6);
 
     bool ok = visit_block();
     if (!ok) return false;
 
-    size_t text_size_bak = text_size;
-    asm_je(text_size - je_pos);
-    text_size = text_size_bak;
+    asm_jmp(loop_pos - text_size - 5);
 
-    asm_jmp(text_size - loop_pos);
+    size_t text_size_bak = text_size;
+    text_size = je_pos;
+    asm_je(text_size_bak - je_pos - 6);
+    text_size = text_size_bak;
 
     return true;
 }
