@@ -82,7 +82,6 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
 Expr visit_expr() {
     ExprToken expr_stack[1 << 10];
     size_t expr_stack_size = 0;
-    size_t expr_registers_busy_pre = expr_registers_busy;
 
     bool ok = shunting_yard(expr_stack, &expr_stack_size);
     if (!ok) return (Expr){};
@@ -99,9 +98,9 @@ Expr visit_expr() {
                 Operand o2 = eval_stack[eval_stack_size - 1];
                 eval_stack_size--;
                 Operand* o1 = &eval_stack[eval_stack_size - 1];
+                Operand tmp = expr_registers[expr_registers_busy++];
                 switch (op.tag) {
                     case OP_ADD: {
-                        Operand tmp = expr_registers[expr_registers_busy++];
                         asm_mov(tmp, o2);
                         asm_add(tmp, *o1);
                         *o1 = tmp;
@@ -109,14 +108,16 @@ Expr visit_expr() {
                     }
                     case OP_LE: {
                         asm_cmp(*o1, o2);
-                        asm_mov(*o1, immediate(0));
-                        asm_setle(*o1);
+                        asm_mov(tmp, immediate(0));
+                        asm_setle(tmp);
+                        *o1 = tmp;
                         break;
                     }
                     case OP_LT: {
                         asm_cmp(*o1, o2);
-                        asm_mov(*o1, immediate(0));
-                        asm_setl(*o1);
+                        asm_mov(tmp, immediate(0));
+                        asm_setl(tmp);
+                        *o1 = tmp;
                         break;
                     }
                     case OP_ASSIGN: {
@@ -179,6 +180,5 @@ Expr visit_expr() {
 
     Expr res = {.ok = true};
     res.operand = eval_stack[0];
-    expr_registers_busy = expr_registers_busy_pre;
     return res;
 }

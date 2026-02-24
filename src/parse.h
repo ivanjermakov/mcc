@@ -390,6 +390,9 @@ bool visit_return() {
 
 // statement = if | while | (expr ";") | return | var_def
 bool visit_statement() {
+    assert(expr_registers_busy < 14);
+    expr_registers_busy = 0;
+
     if (token_buf[token_pos].type == IF) {
         bool ok = visit_if();
         if (!ok) return false;
