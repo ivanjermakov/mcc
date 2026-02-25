@@ -64,6 +64,7 @@ Expr visit_call();
 bool visit_block();
 bool visit_var_def();
 Expr visit_index();
+bool visit_statement();
 
 typedef struct {
     bool ok;
@@ -188,10 +189,12 @@ Operator visit_op_infix() {
         case EQUALS: {
             token_pos++;
             if (token_buf[token_pos].type == EQUALS) {
+                token_pos++;
                 op.tag = OP_EQ;
                 return op;
             }
             if (token_buf[token_pos].type == EXCL) {
+                token_pos++;
                 op.tag = OP_NEQ;
                 return op;
             }
@@ -206,6 +209,16 @@ Operator visit_op_infix() {
         case PERCENT: {
             token_pos++;
             op.tag = OP_REMAINDER;
+            return op;
+        }
+        case AMPERSAND: {
+            token_pos++;
+            if (token_buf[token_pos].type == AMPERSAND) {
+                token_pos++;
+                op.tag = OP_AND;
+            } else {
+                op.tag = OP_ADDRESS_OF;
+            }
             return op;
         }
         case O_ANGLE: {
@@ -315,13 +328,36 @@ Expr visit_operand() {
     return expr;
 }
 
-// if = "if" "(" expr ")" block
+// if = "if" "(" expr ")" (block | statement) ("else" (block | statement))?
 bool visit_if() {
-    fprintf(stderr, "TODO if\n");
-    return false;
+    bool ok;
+    token_pos += 2;
+
+    Expr expr = visit_expr();
+    if (!expr.ok) return false;
+    token_pos++;
+
+    if (token_buf[token_pos].type == O_BRACE) {
+        ok = visit_block();
+    } else {
+        ok = visit_statement();
+    }
+    if (!ok) return false;
+
+    if (token_buf[token_pos].type == ELSE) {
+        token_pos++;
+        if (token_buf[token_pos].type == O_BRACE) {
+            ok = visit_block();
+        } else {
+            ok = visit_statement();
+        }
+    }
+    if (!ok) return false;
+
+    return true;
 }
 
-// while = "while" "(" expr ")" block
+// while = "while" "(" expr ")" (block | statement)
 bool visit_while() {
     int32_t loop_pos = text_size;
 
@@ -334,8 +370,13 @@ bool visit_while() {
     size_t je_pos = text_size;
     asm_canary(6);
 
-    bool ok = visit_block();
-    if (!ok) return false;
+    if (token_buf[token_pos].type == O_BRACE) {
+        bool ok = visit_block();
+        if (!ok) return false;
+    } else {
+        bool ok = visit_statement();
+        if (!ok) return false;
+    }
 
     asm_jmp(loop_pos - text_size - 5);
 

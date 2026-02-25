@@ -33,6 +33,7 @@ typedef enum {
     ASTERISK,
     AMPERSAND,
     IF,
+    ELSE,
     WHILE,
     RETURN,
     PLUS,
@@ -44,16 +45,16 @@ typedef enum {
     PERCENT,
 } TokenType;
 const char* token_literal[] = {
-    NULL, NULL, NULL, NULL, NULL, NULL,    "#",      ";", "'", "\"", "{", "}", "(", ")", "[",
-    "]",  ",",  "*",  "&",  "if", "while", "return", "+", "=", "<",  ">", "!", ".", "%",
+    NULL, NULL, NULL, NULL, NULL, NULL,   "#",     ";",      "'", "\"", "{", "}", "(", ")", "[",
+    "]",  ",",  "*",  "&",  "if", "else", "while", "return", "+", "=",  "<", ">", "!", ".", "%",
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
 const char* token_name[] = {"NONE",      "IDENT",   "INT",      "STRING_PART", "CHAR",
                             "ESCAPE",    "HASH",    "SEMI",     "QUOTE",       "DQUOTE",
                             "O_BRACE",   "C_BRACE", "O_PAREN",  "C_PAREN",     "O_BRACKET",
                             "C_BRACKET", "COMMA",   "ASTERISK", "AMPERSAND",   "IF",
-                            "WHILE",     "RETURN",  "PLUS",     "EQUALS",      "O_ANGLE",
-                            "C_ANGLE",   "EXCL",    "PERIOD",   "PERCENT"};
+                            "ELSE",      "WHILE",   "RETURN",   "PLUS",        "EQUALS",
+                            "O_ANGLE",   "C_ANGLE", "EXCL",     "PERIOD",      "PERCENT"};
 
 typedef struct {
     Span span;
@@ -150,6 +151,9 @@ typedef enum {
     OP_INCREMENT,
     OP_ASSIGN,
     OP_REMAINDER,
+    OP_AND,
+    OP_OR,
+    OP_ADDRESS_OF,
 } OperatorTag;
 
 typedef struct {
@@ -159,9 +163,7 @@ typedef struct {
     Operand operand;
 } Operator;
 
-uint8_t operator_precedence[] = {
-    4, 4, 7, 7, 6, 6, 6, 6, 1, 2, 14,
-};
+uint8_t operator_precedence[] = {4, 4, 7, 7, 6, 6, 6, 6, 1, 2, 14, 3, 11, 12, 2};
 
 typedef enum {
     ASSOC_LEFT,
@@ -169,8 +171,9 @@ typedef enum {
 } Associativity;
 
 uint8_t operator_associativity[] = {
-    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT,  ASSOC_LEFT,  ASSOC_LEFT,
-    ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT, ASSOC_RIGHT,
+    ASSOC_LEFT,  ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT,
+    ASSOC_LEFT,  ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT,
+    ASSOC_RIGHT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT,
 };
 
 typedef struct {

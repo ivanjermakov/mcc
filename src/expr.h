@@ -120,6 +120,40 @@ Expr visit_expr() {
                         *o1 = tmp;
                         break;
                     }
+                    case OP_GE: {
+                        asm_cmp(*o1, o2);
+                        asm_mov(tmp, immediate(0));
+                        asm_setge(tmp);
+                        *o1 = tmp;
+                        break;
+                    }
+                    case OP_GT: {
+                        asm_cmp(*o1, o2);
+                        asm_mov(tmp, immediate(0));
+                        asm_setg(tmp);
+                        *o1 = tmp;
+                        break;
+                    }
+                    case OP_REMAINDER: {
+                        fprintf(stderr, "TODO op_remainder\n");
+                        break;
+                    }
+                    case OP_AND: {
+                        fprintf(stderr, "TODO op_and\n");
+                        break;
+                    }
+                    case OP_OR: {
+                        fprintf(stderr, "TODO op_or\n");
+                        break;
+                    }
+                    case OP_EQ: {
+                        fprintf(stderr, "TODO op_eq\n");
+                        break;
+                    }
+                    case OP_NEQ: {
+                        fprintf(stderr, "TODO op_neq\n");
+                        break;
+                    }
                     case OP_ASSIGN: {
                         if (o1->lvalue.size == 0) {
                             fprintf(stderr, "Not an lvalue\n");

@@ -368,6 +368,44 @@ void asm_setl(Operand a) {
     asm_nop();
 }
 
+void asm_setge(Operand a) {
+    if (a.tag == REGISTER) {
+        text_buf[text_size++] = 0x0F;
+        text_buf[text_size++] = 0x9D;
+        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        return;
+    }
+    if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
+        text_buf[text_size++] = 0x0F;
+        text_buf[text_size++] = 0x9D;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, 0, RM_DI);
+        memcpy(&text_buf[text_size], &a.memory.offset, 4);
+        text_size += 4;
+        return;
+    }
+    fprintf(stderr, "TODO asm_setl %d\n", a.tag);
+    asm_nop();
+}
+
+void asm_setg(Operand a) {
+    if (a.tag == REGISTER) {
+        text_buf[text_size++] = 0x0F;
+        text_buf[text_size++] = 0x9F;
+        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        return;
+    }
+    if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
+        text_buf[text_size++] = 0x0F;
+        text_buf[text_size++] = 0x9F;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, 0, RM_DI);
+        memcpy(&text_buf[text_size], &a.memory.offset, 4);
+        text_size += 4;
+        return;
+    }
+    fprintf(stderr, "TODO asm_setl %d\n", a.tag);
+    asm_nop();
+}
+
 void write_elf(FILE* out_file) {
     uint8_t sections_buf[1 << 14] = {0};
     size_t sections_size = 0;
