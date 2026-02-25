@@ -1,16 +1,21 @@
 .PHONY: build
+LDFLAGS = /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -z noexecstack
 
 build:
+	mkdir -p build
 	clang src/mcc.c -std=c99 -Wall -Wextra -g -o build/mcc
 
 test: build
-	./test.sh
+	./test.sh /usr/lib64
+
+ci: build
+	./test.sh /usr/lib/x86_64-linux-gnu
 
 compile_hello: build
 	build/mcc test/hello.c build/hello.o
 
 link_hello: compile_hello
-	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/hello.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/hello
+	ld $(LDFLAGS) build/hello.o -o build/hello
 
 run_hello: link_hello
 	build/hello
@@ -22,7 +27,7 @@ compile_fn: build
 	build/mcc test/fn.c build/fn.o
 
 link_fn: compile_fn
-	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/fn.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/fn
+	ld $(LDFLAGS) build/fn.o -o build/fn
 
 run_fn: link_fn
 	build/fn
@@ -34,7 +39,7 @@ compile_ascii: build
 	build/mcc test/ascii.c build/ascii.o
 
 link_ascii: compile_ascii
-	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/ascii.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/ascii
+	ld $(LDFLAGS) build/ascii.o -o build/ascii
 
 run_ascii: link_ascii
 	build/ascii

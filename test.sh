@@ -1,7 +1,9 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 passed=0
 failed=0
+libc_path=$1
+ld_flags="$libc_path/crt1.o $libc_path/crti.o $libc_path/crtn.o -lc -dynamic-linker $libc_path/ld-linux-x86-64.so.2 -z noexecstack"
 
 for f in test/*; do
     name=$(basename $f)
@@ -9,7 +11,7 @@ for f in test/*; do
     rm -f build/$name.o
 	build/mcc test/$name.c build/$name.o
     rm -f build/$name
-	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/$name.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/$name
+	ld $ld_flags build/$name.o -o build/$name
 
     expected=$(cat test/$name.c | grep -m 1 '^// [0-9]' | awk '{print $2}')
     (set -x; build/$name)
