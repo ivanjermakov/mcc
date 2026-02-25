@@ -180,7 +180,8 @@ Type visit_type() {
     return type;
 }
 
-// op = "=" | "+" | "-" | "&" | "|" | "^" | "<<" | ">>" | "==" | "!=" | "<" | ">" | "<=" | ">="
+// op_infix = "=" | "+" | "-" | "%" | "&" | "|" | "^" | "<<" | ">>" | "==" | "!=" | "<" | ">" | "<="
+// | ">="
 Operator visit_op_infix() {
     Operator op = {.type = INFIX};
     switch (token_buf[token_pos].type) {
@@ -200,6 +201,11 @@ Operator visit_op_infix() {
         case PLUS: {
             token_pos++;
             op.tag = OP_ADD;
+            return op;
+        }
+        case PERCENT: {
+            token_pos++;
+            op.tag = OP_REMAINDER;
             return op;
         }
         case O_ANGLE: {
@@ -437,14 +443,23 @@ bool visit_block() {
     return true;
 }
 
-// param = type IDENT
+// param = (type IDENT) | "..."
 typedef struct {
     bool ok;
+    bool spread;
     Type type;
     Ident name;
     Operand operand;
 } Param;
 Param visit_param(size_t param_index) {
+    if (token_buf[token_pos].type == PERIOD) {
+        token_pos += 3;
+        return (Param){
+            .ok = true,
+            .spread = true,
+        };
+    }
+
     Param param = {};
     param.type = visit_type();
     if (!param.type.ok) return param;

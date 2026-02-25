@@ -12,7 +12,7 @@ for f in test/*; do
 	ld /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o build/$name.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -o build/$name
 
     expected=$(cat test/$name.c | grep -m 1 '^// [0-9]' | awk '{print $2}')
-	build/$name
+    (set -x; build/$name)
     actual=$?
     if [[ $expected == $actual ]]; then
         echo -e "\e[32mok\e[0m $name"

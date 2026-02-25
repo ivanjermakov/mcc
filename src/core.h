@@ -40,17 +40,20 @@ typedef enum {
     O_ANGLE,
     C_ANGLE,
     EXCL,
+    PERIOD,
+    PERCENT,
 } TokenType;
 const char* token_literal[] = {
-    NULL, NULL, NULL, NULL, NULL, NULL, "#",     ";",      "'", "\"", "{", "}", "(", ")",
-    "[",  "]",  ",",  "*",  "&",  "if", "while", "return", "+", "=",  "<", ">", "!",
+    NULL, NULL, NULL, NULL, NULL, NULL,    "#",      ";", "'", "\"", "{", "}", "(", ")", "[",
+    "]",  ",",  "*",  "&",  "if", "while", "return", "+", "=", "<",  ">", "!", ".", "%",
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
-const char* token_name[] = {
-    "NONE",      "IDENT",     "INT",    "STRING_PART", "CHAR",      "ESCAPE",  "HASH",
-    "SEMI",      "QUOTE",     "DQUOTE", "O_BRACE",     "C_BRACE",   "O_PAREN", "C_PAREN",
-    "O_BRACKET", "C_BRACKET", "COMMA",  "ASTERISK",    "AMPERSAND", "IF",      "WHILE",
-    "RETURN",    "PLUS",      "EQUALS", "O_ANGLE",     "C_ANGLE",   "EXCL"};
+const char* token_name[] = {"NONE",      "IDENT",   "INT",      "STRING_PART", "CHAR",
+                            "ESCAPE",    "HASH",    "SEMI",     "QUOTE",       "DQUOTE",
+                            "O_BRACE",   "C_BRACE", "O_PAREN",  "C_PAREN",     "O_BRACKET",
+                            "C_BRACKET", "COMMA",   "ASTERISK", "AMPERSAND",   "IF",
+                            "WHILE",     "RETURN",  "PLUS",     "EQUALS",      "O_ANGLE",
+                            "C_ANGLE",   "EXCL",    "PERIOD",   "PERCENT"};
 
 typedef struct {
     Span span;
@@ -146,6 +149,7 @@ typedef enum {
     OP_INDEX,
     OP_INCREMENT,
     OP_ASSIGN,
+    OP_REMAINDER,
 } OperatorTag;
 
 typedef struct {
