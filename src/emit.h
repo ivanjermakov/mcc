@@ -89,6 +89,10 @@ uint8_t rex(bool w, bool r, bool x, bool b) {
     return (1 << 6) | (w << 3) | (r << 2) | (x << 1) | b;
 }
 
+bool immediate_fits_i32(OperandImmediate i) {
+    return i.value >= INT32_MIN && i.value <= INT32_MAX;
+}
+
 void asm_nop() {
     text_buf[text_size++] = 0x90;
 }
@@ -153,7 +157,7 @@ void asm_mov(Operand a, Operand b) {
             asm_mov(a, tmp);
             return;
         }
-        text_buf[text_size++] = rex(true, false, false, false);
+        text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
         text_buf[text_size++] = 0xB8 + a.reg.i;
         memcpy(&text_buf[text_size], &b.immediate.value, 8);
         text_size += 8;
@@ -201,10 +205,26 @@ void asm_add(Operand a, Operand b) {
         text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, b.reg.i);
         return;
     }
-    if ((a.tag == REGISTER && b.tag == IMMEDIATE) || (a.tag == MEMORY && b.tag == MEMORY)) {
+    if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
+        (a.tag == MEMORY && b.tag == MEMORY)) {
         Operand tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, b);
         asm_add(a, tmp);
+        return;
+    }
+    if (a.tag == REGISTER && b.tag == IMMEDIATE) {
+        if (a.reg.indirect) {
+            Operand tmp = expr_registers[expr_registers_busy];
+            asm_mov(tmp, b);
+            asm_add(a, tmp);
+            return;
+        }
+        text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
+        text_buf[text_size++] = 0x81;
+        text_buf[text_size++] = modrm(MOD_REGISTER, 0, a.reg.i);
+        int32_t i = b.immediate.value;
+        memcpy(&text_buf[text_size], &i, 4);
+        text_size += 4;
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
@@ -232,17 +252,26 @@ void asm_sub(Operand a, Operand b) {
         text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, b.reg.i);
         return;
     }
-    if ((a.tag == REGISTER && b.tag == IMMEDIATE) || (a.tag == MEMORY && b.tag == MEMORY)) {
+    if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
+        (a.tag == MEMORY && b.tag == MEMORY)) {
         Operand tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, b);
         asm_sub(a, tmp);
         return;
     }
-    if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
+    if (a.tag == REGISTER && b.tag == IMMEDIATE) {
+        if (a.reg.indirect) {
+            Operand tmp = expr_registers[expr_registers_busy];
+            asm_mov(tmp, b);
+            asm_sub(a, tmp);
+            return;
+        }
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
-        text_buf[text_size++] = 0x2B;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)b.memory.offset;
+        text_buf[text_size++] = 0x81;
+        text_buf[text_size++] = modrm(MOD_REGISTER, 5, a.reg.i);
+        int32_t i = b.immediate.value;
+        memcpy(&text_buf[text_size], &i, 4);
+        text_size += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {

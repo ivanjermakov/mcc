@@ -585,11 +585,7 @@ bool visit_func_def() {
         bool ok = visit_block();
         if (!ok) return ok;
 
-        // preserve RAX
-        // TODO: emit mov/add/sub r imm32 without using redundant registers
-        expr_registers_busy++;
         asm_add(RSP, immediate(stack_prealloc));
-        expr_registers_busy--;
 
         // TODO: only preserve used registers
         for (size_t i = 1; i <= non_volatile_registers_size; i++) {
