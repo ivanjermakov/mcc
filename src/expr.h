@@ -135,11 +135,37 @@ Expr visit_expr() {
                         break;
                     }
                     case OP_REMAINDER: {
-                        fprintf(stderr, "TODO op_remainder\n");
+                        asm_push(RAX);
+                        asm_push(RDX);
+
+                        asm_mov(RAX, *o1);
+                        asm_idiv(o2);
+                        asm_mov(tmp, RDX);
+
+                        asm_pop(RDX);
+                        asm_pop(RAX);
+
+                        *o1 = tmp;
                         break;
                     }
                     case OP_AND: {
-                        fprintf(stderr, "TODO op_and\n");
+                        asm_cmp(*o1, immediate(0));
+                        asm_mov(tmp, immediate(0));
+                        asm_setne(tmp);
+
+                        size_t je_pos = text_size;
+                        asm_canary(6);
+
+                        asm_cmp(o2, immediate(0));
+                        asm_mov(tmp, immediate(0));
+                        asm_setne(tmp);
+
+                        size_t text_size_bak = text_size;
+                        text_size = je_pos;
+                        asm_je(text_size_bak - je_pos - 6);
+                        text_size = text_size_bak;
+
+                        *o1 = tmp;
                         break;
                     }
                     case OP_OR: {
@@ -147,7 +173,10 @@ Expr visit_expr() {
                         break;
                     }
                     case OP_EQ: {
-                        fprintf(stderr, "TODO op_eq\n");
+                        asm_cmp(*o1, o2);
+                        asm_mov(tmp, immediate(0));
+                        asm_setne(tmp);
+                        *o1 = tmp;
                         break;
                     }
                     case OP_NEQ: {
@@ -156,7 +185,7 @@ Expr visit_expr() {
                     }
                     case OP_ASSIGN: {
                         if (o1->lvalue.size == 0) {
-                            fprintf(stderr, "Not an lvalue\n");
+                            fprintf(stderr, "not an lvalue\n");
                             return (Expr){};
                         }
                         asm_mov((Operand){.tag = REGISTER, .reg = o1->lvalue}, o2);
