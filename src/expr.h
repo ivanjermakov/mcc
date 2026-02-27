@@ -56,7 +56,7 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
 
         if (expr_token.is_operator) {
             Operator op = expr_token.op;
-            while (op_stack_size > 0 && (operator_precedence[op_stack[op_stack_size - 1].tag] >
+            while (op_stack_size > 0 && (operator_precedence[op_stack[op_stack_size - 1].tag] <
                                              operator_precedence[op.tag] ||
                                          (operator_associativity[op.tag] == ASSOC_LEFT &&
                                           operator_precedence[op_stack[op_stack_size - 1].tag] ==
