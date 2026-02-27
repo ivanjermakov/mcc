@@ -262,6 +262,7 @@ void asm_push(Operand a) {
             text_buf[text_size++] = rex(false, false, false, true);
         }
         text_buf[text_size++] = 0x50 + (a.reg.i & 0b111);
+        stack_offset += 8;
         return;
     }
     fprintf(stderr, "TODO asm_push\n");
@@ -274,6 +275,7 @@ void asm_pop(Operand a) {
             text_buf[text_size++] = rex(false, false, false, true);
         }
         text_buf[text_size++] = 0x58 + (a.reg.i & 0b111);
+        stack_offset -= 8;
         return;
     }
     fprintf(stderr, "TODO asm_pop\n");

@@ -402,18 +402,28 @@ Expr visit_call() {
     }
 
     token_pos++;
-    size_t arg_idx = 0;
+    int32_t arg_count = 0;
     while (token_pos < token_size) {
         Expr expr = visit_expr();
         if (!expr.ok) return call;
         if (token_buf[token_pos].type == SEMI) token_pos++;
 
-        asm_mov(argument_registers[arg_idx], expr.operand);
-        arg_idx++;
+        asm_mov(argument_registers[arg_count], expr.operand);
+        arg_count++;
         if (token_buf[token_pos].type == COMMA) token_pos++;
         if (token_buf[token_pos].type == C_PAREN) break;
     }
     token_pos++;
+
+    // TODO: backup RAX
+    // TODO: only for variadic function calls
+    // TODO: properly count vararg count by checking a matched fn def
+    if (arg_count > 1) {
+        asm_mov(RAX, immediate(arg_count - 1));
+    }
+
+    size_t misalign = stack_offset % 16;
+    if (misalign > 0) asm_sub(RSP, immediate(misalign));
 
     if (symbol->entry.name != 0) {
         asm_call_global(symbol);
@@ -421,6 +431,8 @@ Expr visit_call() {
         fprintf(stderr, "TODO asm call\n");
         return call;
     }
+
+    if (misalign > 0) asm_add(RSP, immediate(misalign));
 
     call.operand = RAX;
     call.ok = true;
@@ -531,6 +543,7 @@ bool visit_func_def() {
     Ident name = visit_ident();
     if (!name.ok) return name.ok;
 
+    // look ahead to decide whether this is function declaration or impl
     size_t param_token_pos = token_pos;
     while (token_pos < token_size &&
            !(token_buf[token_pos].type == SEMI || token_buf[token_pos].type == C_PAREN)) {
@@ -538,8 +551,8 @@ bool visit_func_def() {
     }
     token_pos++;
 
-    // TODO: compute
-    size_t stack_alloc = 0xFF;
+    // for push/pop
+    size_t stack_prealloc = 1024;
 
     if (token_buf[token_pos].type == SEMI) {
         symbol_add_global(name.span, symbol_pos, false);
@@ -548,12 +561,15 @@ bool visit_func_def() {
         symbol_add_global(name.span, symbol_pos, true);
         stack_push();
 
+        stack_offset = stack_prealloc;
+
         // TODO: only preserve used registers
         for (size_t i = 0; i < non_volatile_registers_size; i++) {
             asm_push(non_volatile_registers[i]);
         }
+
         asm_mov(RBP, RSP);
-        asm_sub(RSP, immediate(stack_alloc));
+        asm_sub(RSP, immediate(stack_prealloc));
 
         token_pos = param_token_pos;
         token_pos++;
@@ -570,14 +586,16 @@ bool visit_func_def() {
         if (!ok) return ok;
 
         // preserve RAX
+        // TODO: emit mov/add/sub r imm32 without using redundant registers
         expr_registers_busy++;
-        asm_add(RSP, immediate(stack_alloc));
+        asm_add(RSP, immediate(stack_prealloc));
         expr_registers_busy--;
 
         // TODO: only preserve used registers
         for (size_t i = 1; i <= non_volatile_registers_size; i++) {
             asm_pop(non_volatile_registers[non_volatile_registers_size - i]);
         }
+
         asm_ret();
 
         stack_pop();

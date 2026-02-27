@@ -201,6 +201,12 @@ size_t symbols_size = 0;
 Scope stack[1 << 10];
 size_t stack_size = 0;
 
+/**
+ * RSP offset in a current function
+ * push increments to keep it unsigned
+ */
+size_t stack_offset = 0;
+
 void stack_push() {
     stack[stack_size++] = (Scope){
         .symbols_start = symbols_size,
