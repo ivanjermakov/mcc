@@ -497,7 +497,7 @@ void asm_idiv(Operand a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
         text_buf[text_size++] = 0xF7;
-        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 7, a.reg.i);
         return;
     }
     fprintf(stderr, "TODO asm_idiv %d\n", a.tag);
