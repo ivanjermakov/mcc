@@ -6,6 +6,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include "sys/param.h"
 
 typedef struct {
     size_t start;
@@ -101,7 +102,7 @@ typedef struct {
 } OperandImmediate;
 
 typedef enum {
-    REL_RIP,
+    REL_RIP = 1,
     REL_RBP,
     SYMBOL_LOCAL,
     SYMBOL_GLOBAL,
@@ -115,7 +116,7 @@ typedef struct {
 typedef struct {
     OperandTag tag;
     // in case operand is used in lvalue context, use this instead of `o`
-    OperandRegister lvalue;
+    OperandMemory lvalue;
     union {
         OperandRegister reg;
         OperandImmediate immediate;
@@ -163,7 +164,24 @@ typedef struct {
     Operand operand;
 } Operator;
 
-uint8_t operator_precedence[] = {4, 4, 7, 7, 6, 6, 6, 6, 1, 2, 14, 3, 11, 12, 2};
+uint8_t operator_precedence[] = {
+    0,
+    4,  // OP_ADD
+    4,  // OP_SUB
+    7,  // OP_EQ
+    7,  // OP_NEQ
+    6,  // OP_GT
+    6,  // OP_GE
+    6,  // OP_LT
+    6,  // OP_LE
+    1,  // OP_INDEX
+    2,  // OP_INCREMENT
+    14, // OP_ASSIGN
+    3,  // OP_REMAINDER
+    11, // OP_AND
+    12, // OP_OR
+    2,  // OP_ADDRESS_OF
+};
 
 typedef enum {
     ASSOC_LEFT,
@@ -171,15 +189,29 @@ typedef enum {
 } Associativity;
 
 uint8_t operator_associativity[] = {
-    ASSOC_LEFT,  ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT,
-    ASSOC_LEFT,  ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT,
-    ASSOC_RIGHT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_LEFT, ASSOC_RIGHT,
+    0,
+    ASSOC_LEFT,  // OP_ADD
+    ASSOC_LEFT,  // OP_SUB
+    ASSOC_LEFT,  // OP_EQ
+    ASSOC_LEFT,  // OP_NEQ
+    ASSOC_LEFT,  // OP_GT
+    ASSOC_LEFT,  // OP_GE
+    ASSOC_LEFT,  // OP_LT
+    ASSOC_LEFT,  // OP_LE
+    ASSOC_LEFT,  // OP_INDEX
+    ASSOC_RIGHT, // OP_INCREMENT
+    ASSOC_RIGHT, // OP_ASSIGN
+    ASSOC_LEFT,  // OP_REMAINDER
+    ASSOC_LEFT,  // OP_AND
+    ASSOC_LEFT,  // OP_OR
+    ASSOC_RIGHT, // OP_ADDRESS_OF
 };
 
 typedef struct {
     Span span;
     Operand operand;
     size_t size;
+    size_t count;
     size_t item_size;
     size_t index;
     ElfSymbolEntry entry;
@@ -203,14 +235,14 @@ size_t stack_size = 0;
 
 /**
  * RSP offset in a current function
- * push increments to keep it unsigned
  */
-size_t stack_offset = 0;
+int32_t stack_offset = 0;
 
 void stack_push() {
+    Scope last = stack[stack_size];
     stack[stack_size++] = (Scope){
         .symbols_start = symbols_size,
-        .bp_offset = 0,
+        .bp_offset = last.bp_offset,
     };
 }
 

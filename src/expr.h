@@ -1,6 +1,7 @@
 #include "core.h"
 #include "emit.h"
 
+Operand stack_alloc(size_t size);
 Expr visit_operand();
 Operator visit_op_infix();
 Operator visit_op_prefix();
@@ -23,7 +24,7 @@ typedef struct {
  *
  * @see https://en.wikipedia.org/wiki/Shunting_yard_algorithm
  */
-bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
+bool shunting_yard(ExprToken out_queue[], size_t* out_queue_size) {
     Operator op_stack[1 << 10];
     size_t op_stack_size = 0;
 
@@ -49,7 +50,7 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
                 Expr operand = visit_operand();
                 if (!operand.ok) return false;
                 expr_token.operand = operand.operand;
-                expr_stack[(*expr_stack_size)++] = expr_token;
+                out_queue[(*out_queue_size)++] = expr_token;
                 infix_postfix_time = true;
             }
         }
@@ -58,10 +59,10 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
             Operator op = expr_token.op;
             while (op_stack_size > 0 && (operator_precedence[op_stack[op_stack_size - 1].tag] <
                                              operator_precedence[op.tag] ||
-                                         (operator_associativity[op.tag] == ASSOC_LEFT &&
-                                          operator_precedence[op_stack[op_stack_size - 1].tag] ==
-                                              operator_precedence[op.tag]))) {
-                expr_stack[(*expr_stack_size)++] = (ExprToken){
+                                         (operator_precedence[op_stack[op_stack_size - 1].tag] ==
+                                              operator_precedence[op.tag] &&
+                                          operator_associativity[op.tag] == ASSOC_LEFT))) {
+                out_queue[(*out_queue_size)++] = (ExprToken){
                     .is_operator = true,
                     .op = op_stack[--op_stack_size],
                 };
@@ -69,8 +70,9 @@ bool shunting_yard(ExprToken expr_stack[], size_t* expr_stack_size) {
             op_stack[op_stack_size++] = op;
         }
     }
+
     while (op_stack_size > 0) {
-        expr_stack[(*expr_stack_size)++] = (ExprToken){
+        out_queue[(*out_queue_size)++] = (ExprToken){
             .is_operator = true,
             .op = op_stack[--op_stack_size],
         };
@@ -139,13 +141,15 @@ Expr visit_expr() {
                         asm_push(RDX);
 
                         asm_mov(RAX, *o1);
+                        asm_mov(RDX, immediate(0));
                         asm_idiv(o2);
-                        asm_mov(tmp, RDX);
+                        Operand tmp_stack = stack_alloc(8);
+                        asm_mov(tmp_stack, RDX);
 
                         asm_pop(RDX);
                         asm_pop(RAX);
 
-                        *o1 = tmp;
+                        *o1 = tmp_stack;
                         break;
                     }
                     case OP_AND: {
@@ -175,7 +179,7 @@ Expr visit_expr() {
                     case OP_EQ: {
                         asm_cmp(*o1, o2);
                         asm_mov(tmp, immediate(0));
-                        asm_setne(tmp);
+                        asm_sete(tmp);
                         *o1 = tmp;
                         break;
                     }
@@ -184,11 +188,12 @@ Expr visit_expr() {
                         break;
                     }
                     case OP_ASSIGN: {
-                        if (o1->lvalue.size == 0) {
+                        if (o1->lvalue.mode == 0) {
                             fprintf(stderr, "not an lvalue\n");
+                            assert(false);
                             return (Expr){};
                         }
-                        asm_mov((Operand){.tag = REGISTER, .reg = o1->lvalue}, o2);
+                        asm_mov((Operand){.tag = MEMORY, .memory = o1->lvalue}, o2);
                         break;
                     }
                     default: {
@@ -205,16 +210,15 @@ Expr visit_expr() {
                     case OP_INDEX: {
                         Operand idx = op.operand;
                         {
-                            Operand ptr = expr_registers[expr_registers_busy++];
+                            Operand ptr = stack_alloc(8);
                             asm_mov(ptr, idx);
                             asm_add(ptr, *o);
 
                             Operand res = expr_registers[expr_registers_busy++];
-                            ptr.reg.indirect = true;
+                            res.lvalue = ptr.lvalue;
                             asm_mov(res, ptr);
 
                             *o = res;
-                            o->lvalue = ptr.reg;
                         }
                         goto c;
                     }

@@ -3,6 +3,17 @@
 #include "emit.h"
 #include "expr.h"
 
+Operand stack_alloc(size_t size) {
+    Scope* scope = &stack[stack_size];
+    Operand operand = {
+        .tag = MEMORY,
+        .memory = {.mode = REL_RBP, .offset = scope->bp_offset},
+    };
+    operand.lvalue = operand.memory;
+    scope->bp_offset -= size;
+    return operand;
+}
+
 Symbol* symbol_find(Span span) {
     if (stack_size == 0) return NULL;
     for (int64_t scope = stack_size - 1; scope >= 0; scope--) {
@@ -36,16 +47,14 @@ Symbol* symbol_add_global(Span name, size_t pos, bool impl) {
 }
 
 Symbol* symbol_add_stack(Span name_span, size_t size, size_t count) {
-    Scope* scope = &stack[stack_size];
-    scope->bp_offset -= size;
-    Operand operand = {
-        .tag = MEMORY,
-        .memory = {.mode = REL_RBP, .offset = scope->bp_offset},
-    };
+    size_t s = size * MAX(count, 1);
+    Operand operand = stack_alloc(s);
+    operand.lvalue = operand.memory;
     symbols_buf[symbols_size++] = (Symbol){
         .span = name_span,
-        .operand = operand,
-        .size = size * count,
+        .operand = stack_alloc(s),
+        .size = s,
+        .count = count,
         .item_size = size,
     };
     return &symbols_buf[symbols_size - 1];
@@ -295,8 +304,9 @@ Expr visit_operand() {
         if (!ident.ok) return expr;
         Symbol* symbol = symbol_find(ident.span);
         if (symbol == NULL) return expr;
-        if (symbol->size > 0) {
+        if (symbol->count > 0) {
             Operand tmp = expr_registers[expr_registers_busy++];
+            tmp.lvalue = symbol->operand.lvalue;
             asm_lea(tmp, symbol->operand);
             expr.operand = tmp;
         } else {
@@ -318,8 +328,11 @@ Expr visit_operand() {
         fprintf(stderr, "TODO %s\n", token_name[t.type]);
         return expr;
     } else if (t.type == O_PAREN) {
-        fprintf(stderr, "TODO %s\n", token_name[t.type]);
-        return expr;
+        token_pos++;
+        Expr sub_expr = visit_expr();
+        if (!sub_expr.ok) return expr;
+        token_pos++;
+        expr.operand = sub_expr.operand;
     } else {
         fprintf(stderr, "TODO %s\n", token_name[t.type]);
         return expr;
@@ -423,7 +436,7 @@ Expr visit_call() {
     }
 
     size_t misalign = stack_offset % 16;
-    if (misalign > 0) asm_sub(RSP, immediate(misalign));
+    if (misalign != 0) asm_sub(RSP, immediate(misalign));
 
     if (symbol->entry.name != 0) {
         asm_call_global(symbol);
@@ -561,7 +574,7 @@ bool visit_func_def() {
         symbol_add_global(name.span, symbol_pos, true);
         stack_push();
 
-        stack_offset = stack_prealloc;
+        stack_offset = -stack_prealloc;
 
         // TODO: only preserve used registers
         for (size_t i = 0; i < non_volatile_registers_size; i++) {

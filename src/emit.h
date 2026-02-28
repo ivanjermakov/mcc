@@ -194,6 +194,12 @@ void asm_mov(Operand a, Operand b) {
         text_buf[text_size++] = (uint8_t)b.memory.offset;
         return;
     }
+    if (a.tag == MEMORY && b.tag == MEMORY) {
+        Operand tmp = expr_registers[expr_registers_busy];
+        asm_mov(tmp, b);
+        asm_mov(a, tmp);
+        return;
+    }
     fprintf(stderr, "TODO asm_mov %d %d\n", a.tag, b.tag);
     asm_nop();
 }
@@ -291,7 +297,7 @@ void asm_push(Operand a) {
             text_buf[text_size++] = rex(false, false, false, true);
         }
         text_buf[text_size++] = 0x50 + (a.reg.i & 0b111);
-        stack_offset += 8;
+        stack_offset -= 8;
         return;
     }
     fprintf(stderr, "TODO asm_push\n");
@@ -304,7 +310,7 @@ void asm_pop(Operand a) {
             text_buf[text_size++] = rex(false, false, false, true);
         }
         text_buf[text_size++] = 0x58 + (a.reg.i & 0b111);
-        stack_offset -= 8;
+        stack_offset += 8;
         return;
     }
     fprintf(stderr, "TODO asm_pop\n");
@@ -377,7 +383,7 @@ void asm_sete(Operand a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x94;
-        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 0, a.reg.i);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
