@@ -48,8 +48,6 @@ Symbol* symbol_add_global(Span name, size_t pos, bool impl) {
 
 Symbol* symbol_add_stack(Span name_span, size_t size, size_t count) {
     size_t s = size * MAX(count, 1);
-    Operand operand = stack_alloc(s);
-    operand.lvalue = operand.memory;
     symbols_buf[symbols_size++] = (Symbol){
         .span = name_span,
         .operand = stack_alloc(s),
@@ -350,12 +348,21 @@ bool visit_if() {
     if (!expr.ok) return false;
     token_pos++;
 
+    asm_cmp(expr.operand, immediate(0));
+    size_t je_pos = text_size;
+    asm_canary(6);
+
     if (token_buf[token_pos].type == O_BRACE) {
         ok = visit_block();
     } else {
         ok = visit_statement();
     }
     if (!ok) return false;
+
+    size_t text_size_bak = text_size;
+    text_size = je_pos;
+    asm_je(text_size_bak - je_pos - 6);
+    text_size = text_size_bak;
 
     if (token_buf[token_pos].type == ELSE) {
         token_pos++;
