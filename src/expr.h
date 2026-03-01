@@ -104,10 +104,27 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
     if (e.is_operator) {
         Operator op = e.op;
 
-        Operand o2 = visit_expr_(expr_stack, pos).operand;
-
         if (op.type == INFIX) {
+            // some operators require operands to be emitted left-to-right
+            size_t o2_pos = *pos;
+            size_t text_pos = text_size;
+            visit_expr_(expr_stack, pos);
+            text_size = text_pos;
+
             Operand o1 = visit_expr_(expr_stack, pos).operand;
+            size_t end_pos = *pos;
+
+            size_t sc_je_pos;
+            if (op.tag == OP_AND) {
+                asm_cmp(o1.rvalue, immediate(0));
+                sc_je_pos = text_size;
+                asm_canary(6);
+            }
+
+            *pos = o2_pos;
+            Operand o2 = visit_expr_(expr_stack, pos).operand;
+            *pos = end_pos;
+
             Operand out = {.rvalue = expr_registers[expr_registers_busy++]};
             expr.operand = out;
 
@@ -163,16 +180,12 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     asm_mov(out.rvalue, immediate(0));
                     asm_setne(out.rvalue);
 
-                    size_t je_pos = text_size;
-                    asm_canary(6);
-
                     asm_cmp(o2.rvalue, immediate(0));
-                    asm_mov(out.rvalue, immediate(0));
                     asm_setne(out.rvalue);
 
                     size_t text_size_bak = text_size;
-                    text_size = je_pos;
-                    asm_je(text_size_bak - je_pos - 6);
+                    text_size = sc_je_pos;
+                    asm_je(text_size_bak - sc_je_pos - 6);
                     text_size = text_size_bak;
 
                     break;
@@ -184,7 +197,7 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                 case OP_EQ: {
                     asm_cmp(o1.rvalue, o2.rvalue);
                     asm_mov(out.rvalue, immediate(0));
-                    asm_sete(out.rvalue);
+                    asm_setne(out.rvalue);
                     break;
                 }
                 case OP_NEQ: {
@@ -210,32 +223,31 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
             fprintf(stderr, "TODO prefix op %d\n", op.tag);
             return (Expr){};
         } else {
+            Operand o = visit_expr_(expr_stack, pos).operand;
+
             switch (op.tag) {
                 case OP_INDEX: {
-                    asm_nop();
                     Operand idx = op.operand;
-                    {
-                        Operand_ ptr = expr_registers[expr_registers_busy++];
-                        asm_mov(ptr, idx.rvalue);
-                        asm_add(ptr, o2.rvalue);
 
-                        Operand_ ptr_ind = ptr;
-                        ptr_ind.reg.indirect = true;
-                        Operand res = {
-                            .rvalue = ptr,
-                            .lvalue = ptr_ind,
-                        };
+                    Operand_ ptr = expr_registers[expr_registers_busy++];
+                    asm_mov(ptr, idx.rvalue);
+                    asm_add(ptr, o.rvalue);
 
-                        expr.operand = res;
-                    }
+                    Operand_ ptr_ind = ptr;
+                    ptr_ind.reg.indirect = true;
+                    Operand res = {
+                        .rvalue = ptr,
+                        .lvalue = ptr_ind,
+                    };
+
+                    expr.operand = res;
                     break;
                 }
                 case OP_INCREMENT: {
-                    asm_nop();
                     Operand_ tmp = expr_registers[expr_registers_busy++];
-                    asm_mov(tmp, o2.rvalue);
+                    asm_mov(tmp, o.rvalue);
                     asm_add(tmp, immediate(1));
-                    asm_mov(o2.rvalue, tmp);
+                    asm_mov(o.rvalue, tmp);
                     expr_registers_busy--;
                     break;
                 }
