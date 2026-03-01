@@ -164,8 +164,9 @@ void asm_mov(Operand_ a, Operand_ b) {
             return;
         }
         if (immediate_fits_i32(b.immediate)) {
-            text_buf[text_size++] = rex(false, false, false, a.reg.i >= 8);
-            text_buf[text_size++] = 0xB8 + (a.reg.i & 0b111);
+            text_buf[text_size++] = rex(true, false, false, a.reg.i >= 8);
+            text_buf[text_size++] = 0xC7;
+            text_buf[text_size++] = modrm(MOD_REGISTER, 0, (a.reg.i & 0b111));
             memcpy(&text_buf[text_size], &b.immediate.value, 4);
             text_size += 4;
             return;
@@ -350,6 +351,13 @@ void asm_call_global(Symbol* symbol) {
 void asm_je(int32_t rel) {
     text_buf[text_size++] = 0x0F;
     text_buf[text_size++] = 0x84;
+    memcpy(&text_buf[text_size], &rel, 4);
+    text_size += 4;
+}
+
+void asm_jne(int32_t rel) {
+    text_buf[text_size++] = 0x0F;
+    text_buf[text_size++] = 0x85;
     memcpy(&text_buf[text_size], &rel, 4);
     text_size += 4;
 }
