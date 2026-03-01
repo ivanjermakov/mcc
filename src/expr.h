@@ -14,9 +14,21 @@ typedef struct {
     bool is_operator;
     union {
         Operator op;
-        Operand operand;
+        size_t token_pos;
     };
+    bool emitted;
+    Operand operand;
 } ExprToken;
+
+void operand_emit(ExprToken* o) {
+    if (!o->emitted) {
+        o->emitted = true;
+        size_t token_pos_bk = token_pos;
+        token_pos = o->token_pos;
+        o->operand = visit_operand().operand;
+        token_pos = token_pos_bk;
+    }
+}
 
 /**
  * expr  = unary (op_infix unary)*
@@ -47,9 +59,15 @@ bool shunting_yard(ExprToken out_queue[], size_t* out_queue_size) {
                 expr_token.is_operator = true;
                 expr_token.op = op;
             } else {
+                // postpone operand emit to have more flexibility in visit_expr
+                // visit to advance token_pos, record operand_pos to "replay" emit later
+                expr_token.token_pos = token_pos;
+
+                size_t text_pos = text_size;
                 Expr operand = visit_operand();
+                text_size = text_pos;
+
                 if (!operand.ok) return false;
-                expr_token.operand = operand.operand;
                 out_queue[(*out_queue_size)++] = expr_token;
                 infix_postfix_time = true;
             }
@@ -90,17 +108,25 @@ Expr visit_expr() {
 
     assert(expr_stack_size > 0);
     size_t expr_pos = 0;
-    Operand eval_stack[1 << 10] = {};
+    ExprToken eval_stack[1 << 10] = {};
     size_t eval_stack_size = 0;
     while (expr_pos < expr_stack_size) {
         if (expr_stack[expr_pos].is_operator) {
             Operator op = expr_stack[expr_pos++].op;
+
+            assert(eval_stack_size > 0);
+            ExprToken* e2 = &eval_stack[--eval_stack_size];
+            operand_emit(e2);
+            Operand o2 = e2->operand;
+
             if (op.type == INFIX) {
-                assert(eval_stack_size >= 2);
-                Operand o2 = eval_stack[eval_stack_size - 1];
-                eval_stack_size--;
-                Operand* o1 = &eval_stack[eval_stack_size - 1];
+                assert(eval_stack_size > 0);
+                ExprToken* e1 = &eval_stack[eval_stack_size - 1];
                 Operand tmp = expr_registers[expr_registers_busy++];
+
+                operand_emit(e1);
+                Operand* o1 = &e1->operand;
+
                 switch (op.tag) {
                     case OP_ADD: {
                         asm_mov(tmp, o2);
@@ -205,29 +231,29 @@ Expr visit_expr() {
                 fprintf(stderr, "TODO prefix op %d\n", op.tag);
                 return (Expr){};
             } else {
-                Operand* o = &eval_stack[eval_stack_size - 1];
+                Operand* o2 = &e2->operand;
                 switch (op.tag) {
                     case OP_INDEX: {
                         Operand idx = op.operand;
                         {
                             Operand ptr = stack_alloc(8);
                             asm_mov(ptr, idx);
-                            asm_add(ptr, *o);
+                            asm_add(ptr, *o2);
 
                             Operand res = expr_registers[expr_registers_busy++];
                             res.lvalue = ptr.lvalue;
                             asm_mov(res, ptr);
 
-                            *o = res;
+                            *o2 = res;
                         }
                         goto c;
                     }
                     case OP_INCREMENT: {
                         {
                             Operand tmp = expr_registers[expr_registers_busy++];
-                            asm_mov(tmp, *o);
+                            asm_mov(tmp, *o2);
                             asm_add(tmp, immediate(1));
-                            asm_mov(*o, tmp);
+                            asm_mov(*o2, tmp);
                             expr_registers_busy--;
                         }
                         goto c;
@@ -239,13 +265,14 @@ Expr visit_expr() {
                 }
             }
         } else {
-            Operand o = expr_stack[expr_pos++].operand;
-            eval_stack[eval_stack_size++] = o;
+            ExprToken* o = &expr_stack[expr_pos++];
+            if (eval_stack_size == 0) operand_emit(o);
+            eval_stack[eval_stack_size++] = *o;
         }
     c:;
     }
 
     Expr res = {.ok = true};
-    res.operand = eval_stack[0];
+    res.operand = eval_stack[0].operand;
     return res;
 }

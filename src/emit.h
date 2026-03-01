@@ -129,7 +129,7 @@ void asm_lea(Operand a, Operand b) {
 
 void asm_mov(Operand a, Operand b) {
     if (a.tag == IMMEDIATE) {
-        fprintf(stderr, "asm_lea mov _\n");
+        fprintf(stderr, "asm_mov mov _\n");
         assert(false);
         return;
     }
