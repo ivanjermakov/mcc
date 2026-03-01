@@ -144,16 +144,16 @@ void asm_mov(Operand_ a, Operand_ b) {
         text_buf[text_size++] = rex(true, b.reg.i >= 8, false, a.reg.i >= 8);
         if (a.reg.indirect) {
             text_buf[text_size++] = 0x89;
-            text_buf[text_size++] = modrm(MOD_INDIRECT, b.reg.i, a.reg.i);
+            text_buf[text_size++] = modrm(MOD_INDIRECT, (b.reg.i & 0b111), (a.reg.i & 0b111));
             return;
         }
         if (b.reg.indirect) {
             text_buf[text_size++] = 0x8B;
-            text_buf[text_size++] = modrm(MOD_INDIRECT, a.reg.i, b.reg.i);
+            text_buf[text_size++] = modrm(MOD_INDIRECT, (a.reg.i & 0b111), (b.reg.i & 0b111));
             return;
         }
         text_buf[text_size++] = 0x89;
-        text_buf[text_size++] = modrm(MOD_REGISTER, b.reg.i, a.reg.i);
+        text_buf[text_size++] = modrm(MOD_REGISTER, (b.reg.i & 0b111), (a.reg.i & 0b111));
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
@@ -163,8 +163,15 @@ void asm_mov(Operand_ a, Operand_ b) {
             asm_mov(a, tmp);
             return;
         }
-        text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
-        text_buf[text_size++] = 0xB8 + a.reg.i;
+        if (immediate_fits_i32(b.immediate)) {
+            text_buf[text_size++] = rex(false, false, false, a.reg.i >= 8);
+            text_buf[text_size++] = 0xB8 + (a.reg.i & 0b111);
+            memcpy(&text_buf[text_size], &b.immediate.value, 4);
+            text_size += 4;
+            return;
+        }
+        text_buf[text_size++] = rex(true, false, false, a.reg.i >= 8);
+        text_buf[text_size++] = 0xB8 + (a.reg.i & 0b111);
         memcpy(&text_buf[text_size], &b.immediate.value, 8);
         text_size += 8;
         return;
@@ -407,7 +414,7 @@ void asm_setne(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x95;
-        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 0, a.reg.i);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
@@ -426,7 +433,7 @@ void asm_setle(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9E;
-        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 0, a.reg.i);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
@@ -445,7 +452,7 @@ void asm_setl(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9C;
-        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 0, a.reg.i);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
@@ -464,7 +471,7 @@ void asm_setge(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9D;
-        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 0, a.reg.i);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
@@ -483,7 +490,7 @@ void asm_setg(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9F;
-        text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, 0);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 0, a.reg.i);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
