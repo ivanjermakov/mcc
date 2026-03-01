@@ -5,11 +5,11 @@
 
 Operand stack_alloc(size_t size) {
     Scope* scope = &stack[stack_size];
-    Operand operand = {
+    Operand_ o = {
         .tag = MEMORY,
         .memory = {.mode = REL_RBP, .offset = scope->bp_offset},
     };
-    operand.lvalue = operand.memory;
+    Operand operand = {.rvalue = o, .lvalue = o};
     scope->bp_offset -= size;
     return operand;
 }
@@ -138,8 +138,11 @@ Expr visit_string() {
 
     size_t symbol_idx = symbol_add_rodata(symbol_name_buf, symbol_name_size, rodata_size, str_len);
     string.operand = (Operand){
-        .tag = MEMORY,
-        .memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx},
+        .rvalue =
+            {
+                .tag = MEMORY,
+                .memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx},
+            },
     };
     memcpy(&rodata_buf[rodata_size], &str_buf, str_len);
     rodata_size += str_len + 1;
@@ -152,7 +155,7 @@ Expr visit_char() {
     Expr c = {};
     token_pos++;
     // TODO: escape
-    c.operand = immediate(input_buf[token_buf[token_pos].span.start]);
+    c.operand.rvalue = immediate(input_buf[token_buf[token_pos].span.start]);
     token_pos++;
     token_pos++;
     c.ok = true;
@@ -303,9 +306,9 @@ Expr visit_operand() {
         Symbol* symbol = symbol_find(ident.span);
         if (symbol == NULL) return expr;
         if (symbol->count > 0) {
-            Operand tmp = expr_registers[expr_registers_busy++];
-            tmp.lvalue = symbol->operand.lvalue;
-            asm_lea(tmp, symbol->operand);
+            Operand tmp = {.rvalue = expr_registers[expr_registers_busy++],
+                           .lvalue = symbol->operand.lvalue};
+            asm_lea(tmp.rvalue, symbol->operand.rvalue);
             expr.operand = tmp;
         } else {
             expr.operand = symbol->operand;
@@ -313,7 +316,7 @@ Expr visit_operand() {
     } else if (t.type == INT) {
         Int i = visit_int();
         if (!i.ok) return expr;
-        expr.operand = immediate(i.value);
+        expr.operand.rvalue = immediate(i.value);
     } else if (t.type == DQUOTE) {
         Expr string = visit_string();
         if (!string.ok) return expr;
@@ -348,7 +351,7 @@ bool visit_if() {
     if (!expr.ok) return false;
     token_pos++;
 
-    asm_cmp(expr.operand, immediate(0));
+    asm_cmp(expr.operand.rvalue, immediate(0));
     size_t je_pos = text_size;
     asm_canary(6);
 
@@ -386,7 +389,7 @@ bool visit_while() {
     if (!expr.ok) return false;
     token_pos++;
 
-    asm_cmp(expr.operand, immediate(0));
+    asm_cmp(expr.operand.rvalue, immediate(0));
     size_t je_pos = text_size;
     asm_canary(6);
 
@@ -428,7 +431,7 @@ Expr visit_call() {
         if (!expr.ok) return call;
         if (token_buf[token_pos].type == SEMI) token_pos++;
 
-        asm_mov(argument_registers[arg_count], expr.operand);
+        asm_mov(argument_registers[arg_count], expr.operand.rvalue);
         arg_count++;
         if (token_buf[token_pos].type == COMMA) token_pos++;
         if (token_buf[token_pos].type == C_PAREN) break;
@@ -454,7 +457,7 @@ Expr visit_call() {
 
     if (misalign > 0) asm_add(RSP, immediate(misalign));
 
-    call.operand = RAX;
+    call.operand.rvalue = RAX;
     call.ok = true;
     return call;
 }
@@ -464,7 +467,7 @@ bool visit_return() {
     token_pos++;
     Expr expr = visit_expr();
     if (!expr.ok) return expr.ok;
-    asm_mov(RAX, expr.operand);
+    asm_mov(RAX, expr.operand.rvalue);
     token_pos++;
     return true;
 }
@@ -539,17 +542,12 @@ Param visit_param(size_t param_index) {
     param.name = visit_ident();
     if (!param.name.ok) return param;
 
-    Scope* scope = &stack[stack_size];
-    scope->bp_offset -= 8;
-    param.operand = (Operand){
-        .tag = MEMORY,
-        .memory = {.mode = REL_RBP, .offset = scope->bp_offset},
-    };
+    param.operand = stack_alloc(8);
     symbols_buf[symbols_size++] = (Symbol){
         .span = param.name.span,
         .operand = param.operand,
     };
-    asm_mov(param.operand, argument_registers[param_index]);
+    asm_mov(param.operand.rvalue, argument_registers[param_index]);
 
     param.ok = true;
     return param;
@@ -669,9 +667,10 @@ bool visit_var_def() {
             fprintf(stderr, "TODO global assign\n");
         }
     } else {
-        Symbol* symbol = symbol_add_stack(name.span, 8, array_size);
+        // TODO: proper array item size
+        Symbol* symbol = symbol_add_stack(name.span, array_size > 0 ? 1 : 8, array_size);
         if (expr.ok) {
-            asm_mov(symbol->operand, expr.operand);
+            asm_mov(symbol->operand.rvalue, expr.operand.rvalue);
         }
     }
     token_pos++;

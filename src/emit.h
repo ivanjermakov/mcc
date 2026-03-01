@@ -1,28 +1,28 @@
 #pragma once
 #include "core.h"
 
-const Operand RAX = {.tag = REGISTER, .reg = {.i = 0, .size = 64}};
-const Operand RCX = {.tag = REGISTER, .reg = {.i = 1, .size = 64}};
-const Operand RDX = {.tag = REGISTER, .reg = {.i = 2, .size = 64}};
-const Operand RBX = {.tag = REGISTER, .reg = {.i = 3, .size = 64}};
-const Operand RSP = {.tag = REGISTER, .reg = {.i = 4, .size = 64}};
-const Operand RBP = {.tag = REGISTER, .reg = {.i = 5, .size = 64}};
-const Operand RSI = {.tag = REGISTER, .reg = {.i = 6, .size = 64}};
-const Operand RDI = {.tag = REGISTER, .reg = {.i = 7, .size = 64}};
-const Operand R8 = {.tag = REGISTER, .reg = {.i = 8, .size = 64}};
-const Operand R9 = {.tag = REGISTER, .reg = {.i = 9, .size = 64}};
-const Operand R10 = {.tag = REGISTER, .reg = {.i = 10, .size = 64}};
-const Operand R11 = {.tag = REGISTER, .reg = {.i = 11, .size = 64}};
-const Operand R12 = {.tag = REGISTER, .reg = {.i = 12, .size = 64}};
-const Operand R13 = {.tag = REGISTER, .reg = {.i = 13, .size = 64}};
-const Operand R14 = {.tag = REGISTER, .reg = {.i = 14, .size = 64}};
-const Operand R15 = {.tag = REGISTER, .reg = {.i = 15, .size = 64}};
+const Operand_ RAX = {.tag = REGISTER, .reg = {.i = 0, .size = 64}};
+const Operand_ RCX = {.tag = REGISTER, .reg = {.i = 1, .size = 64}};
+const Operand_ RDX = {.tag = REGISTER, .reg = {.i = 2, .size = 64}};
+const Operand_ RBX = {.tag = REGISTER, .reg = {.i = 3, .size = 64}};
+const Operand_ RSP = {.tag = REGISTER, .reg = {.i = 4, .size = 64}};
+const Operand_ RBP = {.tag = REGISTER, .reg = {.i = 5, .size = 64}};
+const Operand_ RSI = {.tag = REGISTER, .reg = {.i = 6, .size = 64}};
+const Operand_ RDI = {.tag = REGISTER, .reg = {.i = 7, .size = 64}};
+const Operand_ R8 = {.tag = REGISTER, .reg = {.i = 8, .size = 64}};
+const Operand_ R9 = {.tag = REGISTER, .reg = {.i = 9, .size = 64}};
+const Operand_ R10 = {.tag = REGISTER, .reg = {.i = 10, .size = 64}};
+const Operand_ R11 = {.tag = REGISTER, .reg = {.i = 11, .size = 64}};
+const Operand_ R12 = {.tag = REGISTER, .reg = {.i = 12, .size = 64}};
+const Operand_ R13 = {.tag = REGISTER, .reg = {.i = 13, .size = 64}};
+const Operand_ R14 = {.tag = REGISTER, .reg = {.i = 14, .size = 64}};
+const Operand_ R15 = {.tag = REGISTER, .reg = {.i = 15, .size = 64}};
 
-Operand expr_registers[] = {RAX, RCX, RDX, RBX, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15};
+Operand_ expr_registers[] = {RAX, RCX, RDX, RBX, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15};
 size_t expr_registers_size = sizeof expr_registers / sizeof expr_registers[0];
 size_t expr_registers_busy = 0;
-Operand argument_registers[] = {RDI, RSI, RDX, RCX, R8, R9};
-Operand non_volatile_registers[] = {RBX, RSI, RDI, RBP, R8, R9, R10, R11, R12, R13, R14, R15};
+Operand_ argument_registers[] = {RDI, RSI, RDX, RCX, R8, R9};
+Operand_ non_volatile_registers[] = {RBX, RSI, RDI, RBP, R8, R9, R10, R11, R12, R13, R14, R15};
 size_t non_volatile_registers_size =
     sizeof non_volatile_registers / sizeof non_volatile_registers[0];
 
@@ -102,7 +102,12 @@ void asm_canary(size_t size) {
     text_size += size;
 }
 
-void asm_lea(Operand a, Operand b) {
+void asm_pad(size_t size) {
+    memset(&text_buf[text_size], 0x90, size);
+    text_size += size;
+}
+
+void asm_lea(Operand_ a, Operand_ b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
         fprintf(stderr, "asm_lea _ r\n");
         assert(false);
@@ -119,15 +124,16 @@ void asm_lea(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
         text_buf[text_size++] = 0x8D;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)b.memory.offset;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, a.reg.i, RM_DI);
+        memcpy(&text_buf[text_size], &b.memory.offset, 4);
+        text_size += 4;
         return;
     }
     fprintf(stderr, "TODO asm_lea %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
-void asm_mov(Operand a, Operand b) {
+void asm_mov(Operand_ a, Operand_ b) {
     if (a.tag == IMMEDIATE) {
         fprintf(stderr, "asm_mov mov _\n");
         assert(false);
@@ -152,7 +158,7 @@ void asm_mov(Operand a, Operand b) {
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
         if (a.reg.indirect) {
-            Operand tmp = expr_registers[expr_registers_busy];
+            Operand_ tmp = expr_registers[expr_registers_busy];
             asm_mov(tmp, b);
             asm_mov(a, tmp);
             return;
@@ -170,32 +176,27 @@ void asm_mov(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
         text_buf[text_size++] = 0x8B;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)b.memory.offset;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, a.reg.i, RM_DI);
+        memcpy(&text_buf[text_size], &b.memory.offset, 4);
+        text_size += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
         text_buf[text_size++] = 0x89;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, b.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)a.memory.offset;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, b.reg.i, RM_DI);
+        memcpy(&text_buf[text_size], &a.memory.offset, 4);
+        text_size += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == IMMEDIATE) {
-        Operand tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, b);
         asm_mov(a, tmp);
         return;
     }
-    if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
-        text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
-        text_buf[text_size++] = 0x8B;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)b.memory.offset;
-        return;
-    }
     if (a.tag == MEMORY && b.tag == MEMORY) {
-        Operand tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, b);
         asm_mov(a, tmp);
         return;
@@ -204,7 +205,7 @@ void asm_mov(Operand a, Operand b) {
     asm_nop();
 }
 
-void asm_add(Operand a, Operand b) {
+void asm_add(Operand_ a, Operand_ b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
         text_buf[text_size++] = 0x03;
@@ -213,14 +214,14 @@ void asm_add(Operand a, Operand b) {
     }
     if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
         (a.tag == MEMORY && b.tag == MEMORY)) {
-        Operand tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, b);
         asm_add(a, tmp);
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
         if (a.reg.indirect) {
-            Operand tmp = expr_registers[expr_registers_busy];
+            Operand_ tmp = expr_registers[expr_registers_busy];
             asm_mov(tmp, b);
             asm_add(a, tmp);
             return;
@@ -236,22 +237,24 @@ void asm_add(Operand a, Operand b) {
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
         text_buf[text_size++] = 0x03;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, a.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)b.memory.offset;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, a.reg.i, RM_DI);
+        memcpy(&text_buf[text_size], &b.memory.offset, 4);
+        text_size += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {
         text_buf[text_size++] = rex(true, b.reg.i >= 8, false, false);
         text_buf[text_size++] = 0x01;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, b.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)b.memory.offset;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, b.reg.i, RM_DI);
+        memcpy(&text_buf[text_size], &a.memory.offset, 4);
+        text_size += 4;
         return;
     }
     fprintf(stderr, "TODO asm_add %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
-void asm_sub(Operand a, Operand b) {
+void asm_sub(Operand_ a, Operand_ b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
         text_buf[text_size++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
         text_buf[text_size++] = 0x2B;
@@ -260,14 +263,14 @@ void asm_sub(Operand a, Operand b) {
     }
     if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
         (a.tag == MEMORY && b.tag == MEMORY)) {
-        Operand tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, b);
         asm_sub(a, tmp);
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
         if (a.reg.indirect) {
-            Operand tmp = expr_registers[expr_registers_busy];
+            Operand_ tmp = expr_registers[expr_registers_busy];
             asm_mov(tmp, b);
             asm_sub(a, tmp);
             return;
@@ -283,15 +286,16 @@ void asm_sub(Operand a, Operand b) {
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {
         text_buf[text_size++] = rex(true, b.reg.i >= 8, false, false);
         text_buf[text_size++] = 0x29;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, b.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)b.memory.offset;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, b.reg.i, RM_DI);
+        memcpy(&text_buf[text_size], &a.memory.offset, 4);
+        text_size += 4;
         return;
     }
     fprintf(stderr, "TODO asm_sub %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
-void asm_push(Operand a) {
+void asm_push(Operand_ a) {
     if (a.tag == REGISTER) {
         if (a.reg.i >= 8) {
             text_buf[text_size++] = rex(false, false, false, true);
@@ -304,7 +308,7 @@ void asm_push(Operand a) {
     asm_nop();
 }
 
-void asm_pop(Operand a) {
+void asm_pop(Operand_ a) {
     if (a.tag == REGISTER) {
         if (a.reg.i >= 8) {
             text_buf[text_size++] = rex(false, false, false, true);
@@ -349,8 +353,8 @@ void asm_jmp(int32_t rel) {
     text_size += 4;
 }
 
-void asm_cmp(Operand a, Operand b) {
-    Operand tmp = b;
+void asm_cmp(Operand_ a, Operand_ b) {
+    Operand_ tmp = b;
     if (a.tag == IMMEDIATE) {
         tmp = expr_registers[expr_registers_busy++];
         asm_mov(tmp, a);
@@ -371,15 +375,16 @@ void asm_cmp(Operand a, Operand b) {
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
         text_buf[text_size++] = rex(true, tmp.reg.i >= 8, false, false);
         text_buf[text_size++] = 0x39;
-        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP8, tmp.reg.i, RM_DI);
-        text_buf[text_size++] = (uint8_t)a.memory.offset;
+        text_buf[text_size++] = modrm(MOD_INDIRECT_DISP32, tmp.reg.i, RM_DI);
+        memcpy(&text_buf[text_size], &a.memory.offset, 4);
+        text_size += 4;
         return;
     }
     fprintf(stderr, "TODO asm_cmp %d %d\n", a.tag, b.tag);
     asm_nop();
 }
 
-void asm_sete(Operand a) {
+void asm_sete(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x94;
@@ -398,7 +403,7 @@ void asm_sete(Operand a) {
     asm_nop();
 }
 
-void asm_setne(Operand a) {
+void asm_setne(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x95;
@@ -417,7 +422,7 @@ void asm_setne(Operand a) {
     asm_nop();
 }
 
-void asm_setle(Operand a) {
+void asm_setle(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9E;
@@ -436,7 +441,7 @@ void asm_setle(Operand a) {
     asm_nop();
 }
 
-void asm_setl(Operand a) {
+void asm_setl(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9C;
@@ -455,7 +460,7 @@ void asm_setl(Operand a) {
     asm_nop();
 }
 
-void asm_setge(Operand a) {
+void asm_setge(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9D;
@@ -474,7 +479,7 @@ void asm_setge(Operand a) {
     asm_nop();
 }
 
-void asm_setg(Operand a) {
+void asm_setg(Operand_ a) {
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = 0x9F;
@@ -493,9 +498,9 @@ void asm_setg(Operand a) {
     asm_nop();
 }
 
-void asm_idiv(Operand a) {
+void asm_idiv(Operand_ a) {
     if (a.tag == IMMEDIATE) {
-        Operand tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[expr_registers_busy];
         asm_mov(tmp, a);
         asm_idiv(tmp);
         return;

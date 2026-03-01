@@ -115,17 +115,20 @@ typedef struct {
 
 typedef struct {
     OperandTag tag;
-    // in case operand is used in lvalue context, use this instead of `o`
-    OperandMemory lvalue;
     union {
         OperandRegister reg;
         OperandImmediate immediate;
         OperandMemory memory;
     };
+} Operand_;
+
+typedef struct {
+    Operand_ lvalue;
+    Operand_ rvalue;
 } Operand;
 
-Operand immediate(int64_t value) {
-    return (Operand){.tag = IMMEDIATE, .immediate = {.value = value}};
+Operand_ immediate(int64_t value) {
+    return (Operand_){.tag = IMMEDIATE, .immediate = {.value = value}};
 }
 
 typedef struct {

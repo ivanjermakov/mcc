@@ -108,38 +108,37 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
 
         if (op.type == INFIX) {
             Operand o1 = visit_expr_(expr_stack, pos).operand;
-            Operand out = expr_registers[expr_registers_busy++];
+            Operand out = {.rvalue = expr_registers[expr_registers_busy++]};
             expr.operand = out;
 
             switch (op.tag) {
                 case OP_ADD: {
-                    asm_mov(out, o2);
-                    asm_add(out, o1);
+                    asm_mov(out.rvalue, o2.rvalue);
+                    asm_add(out.rvalue, o1.rvalue);
                     break;
                 }
                 case OP_LE: {
-                    asm_cmp(o1, o2);
-                    asm_mov(out, immediate(0));
-                    asm_setle(out);
+                    asm_cmp(o1.rvalue, o2.rvalue);
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_setle(out.rvalue);
                     break;
                 }
                 case OP_LT: {
-                    asm_cmp(o1, o2);
-                    asm_mov(out, immediate(0));
-                    asm_setl(out);
+                    asm_cmp(o1.rvalue, o2.rvalue);
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_setl(out.rvalue);
                     break;
                 }
                 case OP_GE: {
-                    asm_cmp(o1, o2);
-                    asm_mov(out, immediate(0));
-                    asm_setge(out);
-                    o1 = out;
+                    asm_cmp(o1.rvalue, o2.rvalue);
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_setge(out.rvalue);
                     break;
                 }
                 case OP_GT: {
-                    asm_cmp(o1, o2);
-                    asm_mov(out, immediate(0));
-                    asm_setg(out);
+                    asm_cmp(o1.rvalue, o2.rvalue);
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_setg(out.rvalue);
                     o1 = out;
                     break;
                 }
@@ -147,11 +146,11 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     asm_push(RAX);
                     asm_push(RDX);
 
-                    asm_mov(RAX, o1);
+                    asm_mov(RAX, o1.rvalue);
                     asm_mov(RDX, immediate(0));
-                    asm_idiv(o2);
+                    asm_idiv(o2.rvalue);
                     Operand tmp_stack = stack_alloc(8);
-                    asm_mov(tmp_stack, RDX);
+                    asm_mov(tmp_stack.rvalue, RDX);
 
                     asm_pop(RDX);
                     asm_pop(RAX);
@@ -160,16 +159,16 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_AND: {
-                    asm_cmp(o1, immediate(0));
-                    asm_mov(out, immediate(0));
-                    asm_setne(out);
+                    asm_cmp(o1.rvalue, immediate(0));
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_setne(out.rvalue);
 
                     size_t je_pos = text_size;
                     asm_canary(6);
 
-                    asm_cmp(o2, immediate(0));
-                    asm_mov(out, immediate(0));
-                    asm_setne(out);
+                    asm_cmp(o2.rvalue, immediate(0));
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_setne(out.rvalue);
 
                     size_t text_size_bak = text_size;
                     text_size = je_pos;
@@ -183,9 +182,9 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_EQ: {
-                    asm_cmp(o1, o2);
-                    asm_mov(out, immediate(0));
-                    asm_sete(out);
+                    asm_cmp(o1.rvalue, o2.rvalue);
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_sete(out.rvalue);
                     break;
                 }
                 case OP_NEQ: {
@@ -193,12 +192,12 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_ASSIGN: {
-                    if (o1.lvalue.mode == 0) {
+                    if (o1.lvalue.tag == 0) {
                         fprintf(stderr, "not an lvalue\n");
                         assert(false);
                         return (Expr){};
                     }
-                    asm_mov((Operand){.tag = MEMORY, .memory = o1.lvalue}, o2);
+                    asm_mov(o1.lvalue, o2.rvalue);
                     expr.operand = o2;
                     break;
                 }
@@ -213,25 +212,30 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
         } else {
             switch (op.tag) {
                 case OP_INDEX: {
+                    asm_nop();
                     Operand idx = op.operand;
                     {
-                        Operand ptr = stack_alloc(8);
-                        asm_mov(ptr, idx);
-                        asm_add(ptr, o2);
+                        Operand_ ptr = expr_registers[expr_registers_busy++];
+                        asm_mov(ptr, idx.rvalue);
+                        asm_add(ptr, o2.rvalue);
 
-                        Operand res = expr_registers[expr_registers_busy++];
-                        res.lvalue = ptr.lvalue;
-                        asm_mov(res, ptr);
+                        Operand_ ptr_ind = ptr;
+                        ptr_ind.reg.indirect = true;
+                        Operand res = {
+                            .rvalue = ptr,
+                            .lvalue = ptr_ind,
+                        };
 
                         expr.operand = res;
                     }
                     break;
                 }
                 case OP_INCREMENT: {
-                    Operand tmp = expr_registers[expr_registers_busy++];
-                    asm_mov(tmp, o2);
+                    asm_nop();
+                    Operand_ tmp = expr_registers[expr_registers_busy++];
+                    asm_mov(tmp, o2.rvalue);
                     asm_add(tmp, immediate(1));
-                    asm_mov(o2, tmp);
+                    asm_mov(o2.rvalue, tmp);
                     expr_registers_busy--;
                     break;
                 }
