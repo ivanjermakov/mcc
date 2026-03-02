@@ -197,7 +197,7 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                 case OP_EQ: {
                     asm_cmp(o1.rvalue, o2.rvalue);
                     asm_mov(out.rvalue, immediate(0));
-                    asm_setne(out.rvalue);
+                    asm_sete(out.rvalue);
                     break;
                 }
                 case OP_NEQ: {

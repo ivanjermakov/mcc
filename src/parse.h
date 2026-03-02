@@ -352,7 +352,7 @@ bool visit_if() {
     token_pos++;
 
     asm_cmp(expr.operand.rvalue, immediate(0));
-    size_t je_pos = text_size;
+    size_t else_jmp_pos = text_size;
     asm_canary(6);
 
     if (token_buf[token_pos].type == O_BRACE) {
@@ -362,9 +362,15 @@ bool visit_if() {
     }
     if (!ok) return false;
 
+    size_t end_jmp_pos;
+    if (token_buf[token_pos].type == ELSE) {
+        end_jmp_pos = text_size;
+        asm_canary(6);
+    }
+
     size_t text_size_bak = text_size;
-    text_size = je_pos;
-    asm_je(text_size_bak - je_pos - 6);
+    text_size = else_jmp_pos;
+    asm_je(text_size_bak - else_jmp_pos - 6);
     text_size = text_size_bak;
 
     if (token_buf[token_pos].type == ELSE) {
@@ -374,6 +380,11 @@ bool visit_if() {
         } else {
             ok = visit_statement();
         }
+
+        size_t text_size_bak = text_size;
+        text_size = end_jmp_pos;
+        asm_jmp(text_size_bak - end_jmp_pos - 5);
+        text_size = text_size_bak;
     }
     if (!ok) return false;
 
