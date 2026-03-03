@@ -1,5 +1,6 @@
 .PHONY: build
 LDFLAGS = /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/crtn.o -lc -dynamic-linker /usr/lib64/ld-linux-x86-64.so.2 -z noexecstack
+OBJDUMPFLAGS = -dw --visualize-jumps=color -M intel
 
 build:
 	mkdir -p build
@@ -21,7 +22,7 @@ run_hello: link_hello
 	build/hello
 
 inspect_hello:
-	objdump -d -M intel build/hello.o
+	objdump $(OBJDUMPFLAGS) build/hello.o
 
 compile_fn: build
 	build/mcc test/fn.c build/fn.o
@@ -33,7 +34,7 @@ run_fn: link_fn
 	build/fn
 
 inspect_fn:
-	objdump -d -M intel build/fn.o
+	objdump $(OBJDUMPFLAGS) build/fn.o
 
 compile_ascii: build
 	build/mcc test/ascii.c build/ascii.o
@@ -45,4 +46,16 @@ run_ascii: link_ascii
 	build/ascii
 
 inspect_ascii:
-	objdump -d -M intel build/ascii.o
+	objdump $(OBJDUMPFLAGS) build/ascii.o
+
+compile_fizzbuzz: build
+	build/mcc test/fizzbuzz.c build/fizzbuzz.o
+
+link_fizzbuzz: compile_fizzbuzz
+	ld $(LDFLAGS) build/fizzbuzz.o -o build/fizzbuzz
+
+run_fizzbuzz: link_fizzbuzz
+	build/fizzbuzz
+
+inspect_fizzbuzz:
+	objdump $(OBJDUMPFLAGS) build/fizzbuzz.o
