@@ -114,8 +114,12 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
             Operand o1 = visit_expr_(expr_stack, pos).operand;
             size_t end_pos = *pos;
 
+            Operand out = {.rvalue = expr_registers[expr_registers_busy++]};
+            expr.operand = out;
+
             size_t sc_je_pos;
             if (op.tag == OP_AND) {
+                asm_mov(out.rvalue, immediate(0));
                 asm_cmp(o1.rvalue, immediate(0));
                 sc_je_pos = text_size;
                 asm_canary(6);
@@ -125,9 +129,6 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
             Operand o2 = visit_expr_(expr_stack, pos).operand;
             *pos = end_pos;
 
-            Operand out = {.rvalue = expr_registers[expr_registers_busy++]};
-            expr.operand = out;
-
             switch (op.tag) {
                 case OP_ADD: {
                     asm_mov(out.rvalue, o2.rvalue);
@@ -135,26 +136,26 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_LE: {
-                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_mov(out.rvalue, immediate(0));
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setle(out.rvalue);
                     break;
                 }
                 case OP_LT: {
-                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_mov(out.rvalue, immediate(0));
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setl(out.rvalue);
                     break;
                 }
                 case OP_GE: {
-                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_mov(out.rvalue, immediate(0));
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setge(out.rvalue);
                     break;
                 }
                 case OP_GT: {
-                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_mov(out.rvalue, immediate(0));
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setg(out.rvalue);
                     o1 = out;
                     break;
@@ -176,13 +177,10 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_AND: {
-                    asm_cmp(o1.rvalue, immediate(0));
-                    asm_mov(out.rvalue, immediate(0));
-                    asm_setne(out.rvalue);
+                    // at this point, o1 is guaranteed to be true, so out = o2
+                    asm_mov(out.rvalue, o2.rvalue);
 
-                    asm_cmp(o2.rvalue, immediate(0));
-                    asm_setne(out.rvalue);
-
+                    // patch short circuit je
                     size_t text_size_bak = text_size;
                     text_size = sc_je_pos;
                     asm_je(text_size_bak - sc_je_pos - 6);
@@ -195,8 +193,8 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_EQ: {
-                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_mov(out.rvalue, immediate(0));
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_sete(out.rvalue);
                     break;
                 }

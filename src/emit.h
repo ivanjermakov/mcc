@@ -404,8 +404,16 @@ void asm_cmp(Operand_ a, Operand_ b) {
     asm_nop();
 }
 
+void asm_test(Operand_ a, Operand_ b) {
+    text_buf[text_size++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
+    text_buf[text_size++] = 0x85;
+    text_buf[text_size++] = modrm(MOD_REGISTER, a.reg.i, b.reg.i);
+}
+
 void asm_setx(Operand_ a, uint8_t opcode) {
-    text_buf[text_size++] = rex(false, false, false, a.reg.i >= 8);
+    if (a.reg.i >= 8) {
+        text_buf[text_size++] = rex(false, false, false, true);
+    }
     if (a.tag == REGISTER) {
         text_buf[text_size++] = 0x0F;
         text_buf[text_size++] = opcode;
@@ -456,9 +464,9 @@ void asm_idiv(Operand_ a) {
         return;
     }
     if (a.tag == REGISTER) {
-        text_buf[text_size++] = rex(true, a.reg.i >= 8, false, false);
+        text_buf[text_size++] = rex(true, false, false, a.reg.i >= 8);
         text_buf[text_size++] = 0xF7;
-        text_buf[text_size++] = modrm(MOD_REGISTER, 7, a.reg.i);
+        text_buf[text_size++] = modrm(MOD_REGISTER, 7, a.reg.i & 0b111);
         return;
     }
     fprintf(stderr, "TODO asm_idiv %d\n", a.tag);
