@@ -143,6 +143,11 @@ void asm_mov(Operand_ a, Operand_ b) {
         if (a.reg.i == b.reg.i && a.reg.indirect == false && b.reg.indirect == false) return;
         text_buf[text_size++] = rex(true, b.reg.i >= 8, false, a.reg.i >= 8);
         if (a.reg.indirect) {
+            if (a.reg.size == 8) {
+                text_buf[text_size++] = 0x88;
+                text_buf[text_size++] = modrm(MOD_INDIRECT, (b.reg.i & 0b111), (a.reg.i & 0b111));
+                return;
+            }
             text_buf[text_size++] = 0x89;
             text_buf[text_size++] = modrm(MOD_INDIRECT, (b.reg.i & 0b111), (a.reg.i & 0b111));
             return;
@@ -591,6 +596,8 @@ void write_elf(FILE* out_file) {
     };
     memcpy(&sections_buf[sections_size], &reltext, sizeof reltext);
     sections_size += sizeof reltext;
+
+    assert(sections_size < sizeof sections_buf);
 
     elf_header.shoff = section_header_table_offset;
     elf_header.shnum = 7;

@@ -234,6 +234,8 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     asm_add(ptr, o.rvalue);
 
                     Operand_ ptr_ind = ptr;
+                    // TODO: actual item size
+                    ptr_ind.reg.size = 8;
                     ptr_ind.reg.indirect = true;
                     Operand res = {
                         .rvalue = ptr,
