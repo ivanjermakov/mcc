@@ -218,8 +218,39 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                 }
             }
         } else if (op.type == PREFIX) {
-            fprintf(stderr, "TODO prefix op %d\n", op.tag);
-            return (Expr){};
+            Operand o = visit_expr_(expr_stack, pos).operand;
+            Operand res = {};
+
+            switch (op.tag) {
+                case OP_DEREFERENCE: {
+                    if (o.rvalue.tag == MEMORY) {
+                        res.lvalue = expr_registers[expr_registers_busy++];
+                        res.lvalue.reg.indirect = true;
+                        asm_mov(res.lvalue, o.rvalue);
+
+                        res.rvalue = expr_registers[expr_registers_busy++];
+                        asm_mov(res.rvalue, res.lvalue);
+
+                        expr.operand = res;
+                        break;
+                    }
+
+                    fprintf(stderr, "TODO dereference %d\n", op.tag);
+                    return (Expr){};
+                    break;
+                }
+                case OP_ADDRESS_OF: {
+                    Operand_ tmp = expr_registers[expr_registers_busy++];
+                    asm_lea(tmp, o.rvalue);
+                    res.rvalue = tmp;
+                    expr.operand = res;
+                    break;
+                }
+                default: {
+                    fprintf(stderr, "TODO prefix op %d\n", op.tag);
+                    return (Expr){};
+                }
+            }
         } else {
             Operand o = visit_expr_(expr_stack, pos).operand;
 
@@ -244,10 +275,15 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_INCREMENT: {
+                    if (o.lvalue.tag == 0) {
+                        fprintf(stderr, "not an lvalue\n");
+                        assert(false);
+                        return (Expr){};
+                    }
                     Operand_ tmp = expr_registers[expr_registers_busy++];
                     asm_mov(tmp, o.rvalue);
                     asm_add(tmp, immediate(1));
-                    asm_mov(o.rvalue, tmp);
+                    asm_mov(o.lvalue, tmp);
                     expr_registers_busy--;
                     break;
                 }

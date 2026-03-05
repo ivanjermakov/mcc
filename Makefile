@@ -59,3 +59,15 @@ run_fizzbuzz: link_fizzbuzz
 
 inspect_fizzbuzz:
 	objdump $(OBJDUMPFLAGS) build/fizzbuzz.o
+
+compile_pass_by_ref: build
+	build/mcc test/pass_by_ref.c build/pass_by_ref.o
+
+link_pass_by_ref: compile_pass_by_ref
+	ld $(LDFLAGS) build/pass_by_ref.o -o build/pass_by_ref
+
+run_pass_by_ref: link_pass_by_ref
+	build/pass_by_ref
+
+inspect_pass_by_ref:
+	objdump $(OBJDUMPFLAGS) build/pass_by_ref.o

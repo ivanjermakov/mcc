@@ -80,7 +80,7 @@ typedef struct {
 } Int;
 Int visit_int() {
     Span* span = &token_buf[token_pos].span;
-    int64_t value = strtol(&input_buf[span->start], 0, 10);
+    int64_t value = strtol(&input_buf[span->start], NULL, 10);
     Int i = {.ok = true, .span = span, .value = value};
     token_pos++;
     return i;
@@ -262,6 +262,16 @@ Operator visit_op_infix() {
 Operator visit_op_prefix() {
     Operator op = {.type = PREFIX};
     switch (token_buf[token_pos].type) {
+        case AMPERSAND: {
+            token_pos++;
+            op.tag = OP_ADDRESS_OF;
+            break;
+        }
+        case ASTERISK: {
+            token_pos++;
+            op.tag = OP_DEREFERENCE;
+            break;
+        }
         default: {
         }
     }
@@ -325,9 +335,6 @@ Expr visit_operand() {
         Expr c = visit_char();
         if (!c.ok) return expr;
         expr.operand = c.operand;
-    } else if (t.type == AMPERSAND) {
-        fprintf(stderr, "TODO %s\n", token_name[t.type]);
-        return expr;
     } else if (t.type == O_PAREN) {
         token_pos++;
         Expr sub_expr = visit_expr();
