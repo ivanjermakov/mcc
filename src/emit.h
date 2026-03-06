@@ -39,7 +39,7 @@ ElfHeader elf_header = {
 };
 
 void relocation_add_local(ElfRelocationType type, size_t symbol_index, size_t offset) {
-    ctx.local_relocations_buf[ctx.local_relocations_size++] = (ElfRelocationEntry){
+    ctx.local_relocations[ctx.local_relocations_len++] = (ElfRelocationEntry){
         .offset = offset,
         .type = type,
         .sym = symbol_index,
@@ -97,17 +97,17 @@ bool immediate_fits_i32(OperandImmediate i) {
 }
 
 void asm_nop() {
-    ctx.text_buf[ctx.text_size++] = 0x90;
+    ctx.text[ctx.text_len++] = 0x90;
 }
 
 void asm_canary(size_t size) {
-    memset(&ctx.text_buf[ctx.text_size], 0xAA, size);
-    ctx.text_size += size;
+    memset(&ctx.text[ctx.text_len], 0xAA, size);
+    ctx.text_len += size;
 }
 
 void asm_pad(size_t size) {
-    memset(&ctx.text_buf[ctx.text_size], 0x90, size);
-    ctx.text_size += size;
+    memset(&ctx.text[ctx.text_len], 0x90, size);
+    ctx.text_len += size;
 }
 
 void asm_lea(Operand_ a, Operand_ b) {
@@ -117,19 +117,19 @@ void asm_lea(Operand_ a, Operand_ b) {
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_LOCAL) {
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x8D;
-        ctx.text_buf[ctx.text_size++] = modrm(0, a.reg.i & 0b111, RM_DI);
-        relocation_add_local(PC32, b.memory.offset, ctx.text_size);
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x8D;
+        ctx.text[ctx.text_len++] = modrm(0, a.reg.i & 0b111, RM_DI);
+        relocation_add_local(PC32, b.memory.offset, ctx.text_len);
         asm_canary(4);
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x8D;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &b.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x8D;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &b.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     fprintf(stderr, "TODO asm_lea %d %d\n", a.tag, b.tag);
@@ -144,25 +144,24 @@ void asm_mov(Operand_ a, Operand_ b) {
     }
     if (a.tag == REGISTER && b.tag == REGISTER) {
         if (a.reg.i == b.reg.i && a.reg.indirect == false && b.reg.indirect == false) return;
-        ctx.text_buf[ctx.text_size++] = rex(true, b.reg.i >= 8, false, a.reg.i >= 8);
+        ctx.text[ctx.text_len++] = rex(true, b.reg.i >= 8, false, a.reg.i >= 8);
         if (a.reg.indirect) {
             if (a.reg.size == 8) {
-                ctx.text_buf[ctx.text_size++] = 0x88;
-                ctx.text_buf[ctx.text_size++] =
-                    modrm(MOD_INDIRECT, b.reg.i & 0b111, a.reg.i & 0b111);
+                ctx.text[ctx.text_len++] = 0x88;
+                ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT, b.reg.i & 0b111, a.reg.i & 0b111);
                 return;
             }
-            ctx.text_buf[ctx.text_size++] = 0x89;
-            ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT, b.reg.i & 0b111, a.reg.i & 0b111);
+            ctx.text[ctx.text_len++] = 0x89;
+            ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT, b.reg.i & 0b111, a.reg.i & 0b111);
             return;
         }
         if (b.reg.indirect) {
-            ctx.text_buf[ctx.text_size++] = 0x8B;
-            ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT, a.reg.i & 0b111, b.reg.i & 0b111);
+            ctx.text[ctx.text_len++] = 0x8B;
+            ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT, a.reg.i & 0b111, b.reg.i & 0b111);
             return;
         }
-        ctx.text_buf[ctx.text_size++] = 0x89;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, b.reg.i & 0b111, a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = 0x89;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, b.reg.i & 0b111, a.reg.i & 0b111);
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
@@ -173,17 +172,17 @@ void asm_mov(Operand_ a, Operand_ b) {
             return;
         }
         if (immediate_fits_i32(b.immediate)) {
-            ctx.text_buf[ctx.text_size++] = rex(true, false, false, a.reg.i >= 8);
-            ctx.text_buf[ctx.text_size++] = 0xC7;
-            ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, 0, a.reg.i & 0b111);
-            memcpy(&ctx.text_buf[ctx.text_size], &b.immediate.value, 4);
-            ctx.text_size += 4;
+            ctx.text[ctx.text_len++] = rex(true, false, false, a.reg.i >= 8);
+            ctx.text[ctx.text_len++] = 0xC7;
+            ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, 0, a.reg.i & 0b111);
+            memcpy(&ctx.text[ctx.text_len], &b.immediate.value, 4);
+            ctx.text_len += 4;
             return;
         }
-        ctx.text_buf[ctx.text_size++] = rex(true, false, false, a.reg.i >= 8);
-        ctx.text_buf[ctx.text_size++] = 0xB8 + (a.reg.i & 0b111);
-        memcpy(&ctx.text_buf[ctx.text_size], &b.immediate.value, 8);
-        ctx.text_size += 8;
+        ctx.text[ctx.text_len++] = rex(true, false, false, a.reg.i >= 8);
+        ctx.text[ctx.text_len++] = 0xB8 + (a.reg.i & 0b111);
+        memcpy(&ctx.text[ctx.text_len], &b.immediate.value, 8);
+        ctx.text_len += 8;
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_LOCAL) {
@@ -191,19 +190,19 @@ void asm_mov(Operand_ a, Operand_ b) {
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x8B;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &b.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x8B;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &b.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x89;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, b.reg.i & 0b111, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &a.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x89;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, b.reg.i & 0b111, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &a.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == IMMEDIATE) {
@@ -224,9 +223,9 @@ void asm_mov(Operand_ a, Operand_ b) {
 
 void asm_add(Operand_ a, Operand_ b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
-        ctx.text_buf[ctx.text_size++] = 0x03;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, a.reg.i & 0b111, b.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
+        ctx.text[ctx.text_len++] = 0x03;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, a.reg.i & 0b111, b.reg.i & 0b111);
         return;
     }
     if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
@@ -243,28 +242,28 @@ void asm_add(Operand_ a, Operand_ b) {
             asm_add(a, tmp);
             return;
         }
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x81;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, 0, a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x81;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, 0, a.reg.i & 0b111);
         int32_t i = b.immediate.value;
-        memcpy(&ctx.text_buf[ctx.text_size], &i, 4);
-        ctx.text_size += 4;
+        memcpy(&ctx.text[ctx.text_len], &i, 4);
+        ctx.text_len += 4;
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x03;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &b.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x03;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &b.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = rex(true, b.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x01;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, b.reg.i & 0b111, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &a.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = rex(true, b.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x01;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, b.reg.i & 0b111, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &a.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     fprintf(stderr, "TODO asm_add %d %d\n", a.tag, b.tag);
@@ -273,9 +272,9 @@ void asm_add(Operand_ a, Operand_ b) {
 
 void asm_sub(Operand_ a, Operand_ b) {
     if (a.tag == REGISTER && b.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
-        ctx.text_buf[ctx.text_size++] = 0x2B;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, a.reg.i & 0b111, b.reg.i);
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
+        ctx.text[ctx.text_len++] = 0x2B;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, a.reg.i & 0b111, b.reg.i);
         return;
     }
     if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
@@ -292,20 +291,20 @@ void asm_sub(Operand_ a, Operand_ b) {
             asm_sub(a, tmp);
             return;
         }
-        ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x81;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, 5, a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x81;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, 5, a.reg.i & 0b111);
         int32_t i = b.immediate.value;
-        memcpy(&ctx.text_buf[ctx.text_size], &i, 4);
-        ctx.text_size += 4;
+        memcpy(&ctx.text[ctx.text_len], &i, 4);
+        ctx.text_len += 4;
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = rex(true, b.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x29;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, b.reg.i & 0b111, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &a.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = rex(true, b.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x29;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, b.reg.i & 0b111, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &a.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     fprintf(stderr, "TODO asm_sub %d %d\n", a.tag, b.tag);
@@ -315,9 +314,9 @@ void asm_sub(Operand_ a, Operand_ b) {
 void asm_push(Operand_ a) {
     if (a.tag == REGISTER) {
         if (a.reg.i >= 8) {
-            ctx.text_buf[ctx.text_size++] = rex(false, false, false, true);
+            ctx.text[ctx.text_len++] = rex(false, false, false, true);
         }
-        ctx.text_buf[ctx.text_size++] = 0x50 + (a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = 0x50 + (a.reg.i & 0b111);
         ctx.stack_offset -= 8;
         return;
     }
@@ -328,9 +327,9 @@ void asm_push(Operand_ a) {
 void asm_pop(Operand_ a) {
     if (a.tag == REGISTER) {
         if (a.reg.i >= 8) {
-            ctx.text_buf[ctx.text_size++] = rex(false, false, false, true);
+            ctx.text[ctx.text_len++] = rex(false, false, false, true);
         }
-        ctx.text_buf[ctx.text_size++] = 0x58 + (a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = 0x58 + (a.reg.i & 0b111);
         ctx.stack_offset += 8;
         return;
     }
@@ -339,18 +338,18 @@ void asm_pop(Operand_ a) {
 }
 
 void asm_ret() {
-    ctx.text_buf[ctx.text_size++] = 0xC3;
+    ctx.text[ctx.text_len++] = 0xC3;
 }
 
 void asm_call_global(Symbol* symbol) {
     // correct stack alignment because call implicitly pushes 8 bytes onto the stack
     asm_sub(RSP, immediate(8));
 
-    ctx.text_buf[ctx.text_size++] = 0xE8;
-    ctx.global_relocations_buf[ctx.global_relocations_size++] = (SymbolRelocation){
+    ctx.text[ctx.text_len++] = 0xE8;
+    ctx.global_relocations[ctx.global_relocations_len++] = (SymbolRelocation){
         .symbol = symbol,
         .type = PLT32,
-        .offset = ctx.text_size,
+        .offset = ctx.text_len,
     };
     asm_canary(4);
 
@@ -358,23 +357,23 @@ void asm_call_global(Symbol* symbol) {
 }
 
 void asm_je(int32_t rel) {
-    ctx.text_buf[ctx.text_size++] = 0x0F;
-    ctx.text_buf[ctx.text_size++] = 0x84;
-    memcpy(&ctx.text_buf[ctx.text_size], &rel, 4);
-    ctx.text_size += 4;
+    ctx.text[ctx.text_len++] = 0x0F;
+    ctx.text[ctx.text_len++] = 0x84;
+    memcpy(&ctx.text[ctx.text_len], &rel, 4);
+    ctx.text_len += 4;
 }
 
 void asm_jne(int32_t rel) {
-    ctx.text_buf[ctx.text_size++] = 0x0F;
-    ctx.text_buf[ctx.text_size++] = 0x85;
-    memcpy(&ctx.text_buf[ctx.text_size], &rel, 4);
-    ctx.text_size += 4;
+    ctx.text[ctx.text_len++] = 0x0F;
+    ctx.text[ctx.text_len++] = 0x85;
+    memcpy(&ctx.text[ctx.text_len], &rel, 4);
+    ctx.text_len += 4;
 }
 
 void asm_jmp(int32_t rel) {
-    ctx.text_buf[ctx.text_size++] = 0xE9;
-    memcpy(&ctx.text_buf[ctx.text_size], &rel, 4);
-    ctx.text_size += 4;
+    ctx.text[ctx.text_len++] = 0xE9;
+    memcpy(&ctx.text[ctx.text_len], &rel, 4);
+    ctx.text_len += 4;
 }
 
 void asm_cmp(Operand_ a, Operand_ b) {
@@ -391,17 +390,17 @@ void asm_cmp(Operand_ a, Operand_ b) {
         asm_mov(tmp, b);
     }
     if (a.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = rex(true, tmp.reg.i >= 8, false, a.reg.i >= 8);
-        ctx.text_buf[ctx.text_size++] = 0x3B;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, tmp.reg.i & 0b111, a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = rex(true, tmp.reg.i >= 8, false, a.reg.i >= 8);
+        ctx.text[ctx.text_len++] = 0x3B;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, tmp.reg.i & 0b111, a.reg.i & 0b111);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
-        ctx.text_buf[ctx.text_size++] = rex(true, tmp.reg.i >= 8, false, false);
-        ctx.text_buf[ctx.text_size++] = 0x39;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, tmp.reg.i & 0b111, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &a.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = rex(true, tmp.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x39;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, tmp.reg.i & 0b111, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &a.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     fprintf(stderr, "TODO asm_cmp %d %d\n", a.tag, b.tag);
@@ -409,27 +408,27 @@ void asm_cmp(Operand_ a, Operand_ b) {
 }
 
 void asm_test(Operand_ a, Operand_ b) {
-    ctx.text_buf[ctx.text_size++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
-    ctx.text_buf[ctx.text_size++] = 0x85;
-    ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, a.reg.i & 0b111, b.reg.i & 0b111);
+    ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, b.reg.i >= 8);
+    ctx.text[ctx.text_len++] = 0x85;
+    ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, a.reg.i & 0b111, b.reg.i & 0b111);
 }
 
 void asm_setx(Operand_ a, uint8_t opcode) {
     if (a.reg.i >= 8) {
-        ctx.text_buf[ctx.text_size++] = rex(false, false, false, true);
+        ctx.text[ctx.text_len++] = rex(false, false, false, true);
     }
     if (a.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = 0x0F;
-        ctx.text_buf[ctx.text_size++] = opcode;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, 0, a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = 0x0F;
+        ctx.text[ctx.text_len++] = opcode;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, 0, a.reg.i & 0b111);
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP) {
-        ctx.text_buf[ctx.text_size++] = 0x0F;
-        ctx.text_buf[ctx.text_size++] = opcode;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_INDIRECT_DISP32, 0, RM_DI);
-        memcpy(&ctx.text_buf[ctx.text_size], &a.memory.offset, 4);
-        ctx.text_size += 4;
+        ctx.text[ctx.text_len++] = 0x0F;
+        ctx.text[ctx.text_len++] = opcode;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, 0, RM_DI);
+        memcpy(&ctx.text[ctx.text_len], &a.memory.offset, 4);
+        ctx.text_len += 4;
         return;
     }
     fprintf(stderr, "TODO asm_set* %d\n", a.tag);
@@ -468,9 +467,9 @@ void asm_idiv(Operand_ a) {
         return;
     }
     if (a.tag == REGISTER) {
-        ctx.text_buf[ctx.text_size++] = rex(true, false, false, a.reg.i >= 8);
-        ctx.text_buf[ctx.text_size++] = 0xF7;
-        ctx.text_buf[ctx.text_size++] = modrm(MOD_REGISTER, 7, a.reg.i & 0b111);
+        ctx.text[ctx.text_len++] = rex(true, false, false, a.reg.i >= 8);
+        ctx.text[ctx.text_len++] = 0xF7;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, 7, a.reg.i & 0b111);
         return;
     }
     fprintf(stderr, "TODO asm_idiv %d\n", a.tag);
@@ -478,57 +477,57 @@ void asm_idiv(Operand_ a) {
 }
 
 void write_elf(FILE* out_file) {
-    uint8_t sections_buf[1 << 14] = {0};
-    size_t sections_size = 0;
+    uint8_t sections[1 << 14] = {0};
+    size_t sections_len = 0;
 
-    uint64_t section_text_offset = sizeof elf_header + sections_size;
-    memcpy(&sections_buf[sections_size], &ctx.text_buf, ctx.text_size);
-    sections_size += ctx.text_size;
+    uint64_t section_text_offset = sizeof elf_header + sections_len;
+    memcpy(&sections[sections_len], &ctx.text, ctx.text_len);
+    sections_len += ctx.text_len;
 
-    uint64_t section_rodata_offset = sizeof elf_header + sections_size;
-    memcpy(&sections_buf[sections_size], &ctx.rodata_buf, ctx.rodata_size);
-    sections_size += ctx.rodata_size;
+    uint64_t section_rodata_offset = sizeof elf_header + sections_len;
+    memcpy(&sections[sections_len], &ctx.rodata, ctx.rodata_len);
+    sections_len += ctx.rodata_len;
 
-    uint64_t section_shstrtab_offset = sizeof elf_header + sections_size;
+    uint64_t section_shstrtab_offset = sizeof elf_header + sections_len;
     char* section_names[7] = {".null",   ".text",   ".rodata",  ".shstrtab",
                               ".strtab", ".symtab", ".rel.text"};
     uint32_t shstrtab_offsets[7] = {0};
-    uint8_t shstrtab_buf[1 << 10] = {0};
-    size_t shstrtab_size = 0;
+    uint8_t shstrtab[1 << 10] = {0};
+    size_t shstrtab_len = 0;
     for (size_t i = 0; i < sizeof section_names / sizeof section_names[0]; i++) {
-        shstrtab_offsets[i] = shstrtab_size;
-        memcpy(&shstrtab_buf[shstrtab_size], section_names[i], strlen(section_names[i]));
-        shstrtab_size += strlen(section_names[i]) + 1;
+        shstrtab_offsets[i] = shstrtab_len;
+        memcpy(&shstrtab[shstrtab_len], section_names[i], strlen(section_names[i]));
+        shstrtab_len += strlen(section_names[i]) + 1;
     }
-    memcpy(&sections_buf[sections_size], &shstrtab_buf, shstrtab_size);
-    sections_size += shstrtab_size;
+    memcpy(&sections[sections_len], &shstrtab, shstrtab_len);
+    sections_len += shstrtab_len;
 
-    uint64_t section_strtab_offset = sizeof elf_header + sections_size;
-    memcpy(&sections_buf[sections_size], &ctx.symbol_names_buf, ctx.symbol_names_size);
-    sections_size += ctx.symbol_names_size;
+    uint64_t section_strtab_offset = sizeof elf_header + sections_len;
+    memcpy(&sections[sections_len], &ctx.symbol_names, ctx.symbol_names_len);
+    sections_len += ctx.symbol_names_len;
 
-    uint64_t section_symtab_offset = sizeof elf_header + sections_size;
-    memcpy(&sections_buf[sections_size], &ctx.symbols_local_buf,
-           sizeof(ElfSymbolEntry) * ctx.symbols_local_size);
-    sections_size += sizeof(ElfSymbolEntry) * ctx.symbols_local_size;
+    uint64_t section_symtab_offset = sizeof elf_header + sections_len;
+    memcpy(&sections[sections_len], &ctx.symbols_local,
+           sizeof(ElfSymbolEntry) * ctx.symbols_local_len);
+    sections_len += sizeof(ElfSymbolEntry) * ctx.symbols_local_len;
 
     size_t global_scope_size = stack_scope_size(0);
     for (size_t i = 0; i < global_scope_size; i++) {
-        Symbol* symbol = &ctx.symbols_buf[i];
-        symbol->index = ctx.symbols_local_size + i;
+        Symbol* symbol = &ctx.symbols[i];
+        symbol->index = ctx.symbols_local_len + i;
         ElfSymbolEntry entry = symbol->entry;
-        memcpy(&sections_buf[sections_size], &entry, sizeof entry);
-        sections_size += sizeof entry;
+        memcpy(&sections[sections_len], &entry, sizeof entry);
+        sections_len += sizeof entry;
     }
 
-    uint64_t section_reltext_offset = sizeof elf_header + sections_size;
+    uint64_t section_reltext_offset = sizeof elf_header + sections_len;
 
-    memcpy(&sections_buf[sections_size], &ctx.local_relocations_buf,
-           sizeof(ElfRelocationEntry) * ctx.local_relocations_size);
-    sections_size += sizeof(ElfRelocationEntry) * ctx.local_relocations_size;
+    memcpy(&sections[sections_len], &ctx.local_relocations,
+           sizeof(ElfRelocationEntry) * ctx.local_relocations_len);
+    sections_len += sizeof(ElfRelocationEntry) * ctx.local_relocations_len;
 
-    for (size_t i = 0; i < ctx.global_relocations_size; i++) {
-        SymbolRelocation sym = ctx.global_relocations_buf[i];
+    for (size_t i = 0; i < ctx.global_relocations_len; i++) {
+        SymbolRelocation sym = ctx.global_relocations[i];
         ElfRelocationEntry entry = (ElfRelocationEntry){
             .offset = sym.offset,
             .type = sym.type,
@@ -537,85 +536,85 @@ void write_elf(FILE* out_file) {
             .addend = -4,
 
         };
-        memcpy(&sections_buf[sections_size], &entry, sizeof entry);
-        sections_size += sizeof entry;
+        memcpy(&sections[sections_len], &entry, sizeof entry);
+        sections_len += sizeof entry;
     }
 
-    uint64_t section_header_table_offset = sizeof elf_header + sections_size;
+    uint64_t section_header_table_offset = sizeof elf_header + sections_len;
     ElfSectionHeader null = {0};
-    memcpy(&sections_buf[sections_size], &null, sizeof null);
-    sections_size += sizeof null;
+    memcpy(&sections[sections_len], &null, sizeof null);
+    sections_len += sizeof null;
 
-    ElfSectionHeader text = {
+    ElfSectionHeader section_text = {
         .name = shstrtab_offsets[1],
         .type = 1,
         .flags = 0x02 | 0x04,
         .addr = 0,
         .offset = section_text_offset,
-        .size = ctx.text_size,
+        .size = ctx.text_len,
     };
-    memcpy(&sections_buf[sections_size], &text, sizeof text);
-    sections_size += sizeof text;
+    memcpy(&sections[sections_len], &section_text, sizeof section_text);
+    sections_len += sizeof section_text;
 
-    ElfSectionHeader rodata = {
+    ElfSectionHeader section_rodata = {
         .name = shstrtab_offsets[2],
         .type = 1,
         .flags = 0x02 | 0x10 | 0x20,
         .offset = section_rodata_offset,
-        .size = ctx.rodata_size,
+        .size = ctx.rodata_len,
     };
-    memcpy(&sections_buf[sections_size], &rodata, sizeof rodata);
-    sections_size += sizeof rodata;
+    memcpy(&sections[sections_len], &section_rodata, sizeof section_rodata);
+    sections_len += sizeof section_rodata;
 
-    ElfSectionHeader shstrtab = {
+    ElfSectionHeader section_shstrtab = {
         .name = shstrtab_offsets[3],
         .type = 3,
         .offset = section_shstrtab_offset,
-        .size = shstrtab_size,
+        .size = shstrtab_len,
     };
-    memcpy(&sections_buf[sections_size], &shstrtab, sizeof shstrtab);
-    sections_size += sizeof shstrtab;
+    memcpy(&sections[sections_len], &section_shstrtab, sizeof section_shstrtab);
+    sections_len += sizeof section_shstrtab;
 
-    ElfSectionHeader strtab = {
+    ElfSectionHeader section_strtab = {
         .name = shstrtab_offsets[4],
         .type = 3,
         .offset = section_strtab_offset,
-        .size = ctx.symbol_names_size,
+        .size = ctx.symbol_names_len,
     };
-    memcpy(&sections_buf[sections_size], &strtab, sizeof strtab);
-    sections_size += sizeof strtab;
+    memcpy(&sections[sections_len], &section_strtab, sizeof section_strtab);
+    sections_len += sizeof section_strtab;
 
-    ElfSectionHeader symtab = {
+    ElfSectionHeader section_symtab = {
         .name = shstrtab_offsets[5],
         .type = 2,
         .offset = section_symtab_offset,
-        .size = sizeof(ElfSymbolEntry) * (ctx.symbols_local_size + global_scope_size),
-        .link = 4,                      // index of .strtab section
-        .info = ctx.symbols_local_size, // index of the first non-local symbol
+        .size = sizeof(ElfSymbolEntry) * (ctx.symbols_local_len + global_scope_size),
+        .link = 4,                     // index of .strtab section
+        .info = ctx.symbols_local_len, // index of the first non-local symbol
         .entsize = sizeof(ElfSymbolEntry),
     };
-    memcpy(&sections_buf[sections_size], &symtab, sizeof symtab);
-    sections_size += sizeof symtab;
+    memcpy(&sections[sections_len], &section_symtab, sizeof section_symtab);
+    sections_len += sizeof section_symtab;
 
-    ElfSectionHeader reltext = {
+    ElfSectionHeader section_reltext = {
         .name = shstrtab_offsets[6],
         .type = 4,
         .offset = section_reltext_offset,
         .size =
-            sizeof(ElfRelocationEntry) * (ctx.local_relocations_size + ctx.global_relocations_size),
+            sizeof(ElfRelocationEntry) * (ctx.local_relocations_len + ctx.global_relocations_len),
         .link = 5, // index of a .symtab section
         .info = 1, // index of a .rel.text section
         .entsize = sizeof(ElfRelocationEntry),
     };
-    memcpy(&sections_buf[sections_size], &reltext, sizeof reltext);
-    sections_size += sizeof reltext;
+    memcpy(&sections[sections_len], &section_reltext, sizeof section_reltext);
+    sections_len += sizeof section_reltext;
 
-    assert(sections_size < sizeof sections_buf);
+    assert(sections_len < sizeof sections);
 
     elf_header.shoff = section_header_table_offset;
     elf_header.shnum = 7;
     elf_header.shstrndx = 3;
 
     fwrite(&elf_header, 1, sizeof elf_header, out_file);
-    fwrite(sections_buf, 1, sections_size, out_file);
+    fwrite(sections, 1, sections_len, out_file);
 }

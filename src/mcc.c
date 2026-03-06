@@ -9,14 +9,14 @@ int32_t main(int32_t argc, char* argv[]) {
     }
     char* source_path = argv[1];
     FILE* source_file = fopen(source_path, "r");
-    ctx.input_size = fread(&ctx.input_buf, 1, sizeof ctx.input_buf, source_file);
+    ctx.input_len = fread(&ctx.input, 1, sizeof ctx.input, source_file);
     fclose(source_file);
 
     Token token;
     while (true) {
         token = next_token();
         if (token.type == NONE) break;
-        ctx.token_buf[ctx.token_size++] = token;
+        ctx.tokens[ctx.tokens_len++] = token;
     }
     // for (size_t i = 0; i < token_size; i++) {
     //     Token token = token_buf[i];
@@ -30,7 +30,7 @@ int32_t main(int32_t argc, char* argv[]) {
         fprintf(stderr, "error parsing program\n");
         return 1;
     }
-    assert(ctx.stack_size == 1);
+    assert(ctx.stack_len == 1);
 
     char* out_path = argv[2];
     FILE* out_file = fopen(out_path, "w");

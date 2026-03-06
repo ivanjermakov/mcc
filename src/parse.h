@@ -4,7 +4,7 @@
 #include "expr.h"
 
 Operand stack_alloc(size_t size) {
-    Scope* scope = &ctx.stack[ctx.stack_size];
+    Scope* scope = &ctx.stack[ctx.stack_len];
     Operand_ o = {
         .tag = MEMORY,
         .memory = {.mode = REL_RBP, .offset = scope->bp_offset},
@@ -15,55 +15,55 @@ Operand stack_alloc(size_t size) {
 }
 
 Symbol* symbol_find(Span span) {
-    if (ctx.stack_size == 0) return NULL;
-    for (int64_t scope = ctx.stack_size - 1; scope >= 0; scope--) {
+    if (ctx.stack_len == 0) return NULL;
+    for (int64_t scope = ctx.stack_len - 1; scope >= 0; scope--) {
         size_t scope_size = stack_scope_size(scope);
         for (size_t i = 0; i < scope_size; i++) {
-            Symbol* s = &ctx.symbols_buf[ctx.stack[scope].symbols_start + i];
+            Symbol* s = &ctx.symbols[ctx.stack[scope].symbols_start + i];
             if (span_cmp(span, s->span) == 0) {
                 return s;
             }
         }
     }
-    fprintf(stderr, "symbol \"%.*s\" not found at %zu\n", (int)span.len, &ctx.input_buf[span.start],
+    fprintf(stderr, "symbol \"%.*s\" not found at %zu\n", (int)span.len, &ctx.input[span.start],
             span.start);
     return NULL;
 }
 
 Symbol* symbol_add_global(Span name, size_t pos, bool impl) {
-    memcpy(&ctx.symbol_names_buf[ctx.symbol_names_size], &ctx.input_buf[name.start], name.len);
-    ctx.symbols_buf[ctx.symbols_size++] = (Symbol){
+    memcpy(&ctx.symbol_names[ctx.symbol_names_len], &ctx.input[name.start], name.len);
+    ctx.symbols[ctx.symbols_len++] = (Symbol){
         .span = name,
         .entry =
             {
-                .name = (uint32_t)ctx.symbol_names_size,
+                .name = (uint32_t)ctx.symbol_names_len,
                 .info = (uint8_t)((1 << 4) + (impl ? 2 : 0)),
                 .shndx = (uint16_t)(impl ? 1 : 0),
                 .value = pos,
             },
     };
-    ctx.symbol_names_size += name.len + 1;
-    return &ctx.symbols_buf[ctx.symbols_size - 1];
+    ctx.symbol_names_len += name.len + 1;
+    return &ctx.symbols[ctx.symbols_len - 1];
 }
 
 Symbol* symbol_add_stack(Span name_span, size_t size, size_t count) {
     size_t s = size * MAX(count, 1);
-    ctx.symbols_buf[ctx.symbols_size++] = (Symbol){
+    ctx.symbols[ctx.symbols_len++] = (Symbol){
         .span = name_span,
         .operand = stack_alloc(s),
         .size = s,
         .count = count,
         .item_size = size,
     };
-    return &ctx.symbols_buf[ctx.symbols_size - 1];
+    return &ctx.symbols[ctx.symbols_len - 1];
 }
 
 size_t symbol_add_rodata(char* name, size_t name_size, size_t pos, size_t size) {
-    memcpy(&ctx.symbol_names_buf[ctx.symbol_names_size], name, name_size);
-    size_t idx = ctx.symbols_local_size;
-    ctx.symbols_local_buf[ctx.symbols_local_size++] = (ElfSymbolEntry){
-        .name = (uint32_t)ctx.symbol_names_size, .info = 1, .shndx = 2, .value = pos, .size = size};
-    ctx.symbol_names_size += name_size + 1;
+    memcpy(&ctx.symbol_names[ctx.symbol_names_len], name, name_size);
+    size_t idx = ctx.symbols_local_len;
+    ctx.symbols_local[ctx.symbols_local_len++] = (ElfSymbolEntry){
+        .name = (uint32_t)ctx.symbol_names_len, .info = 1, .shndx = 2, .value = pos, .size = size};
+    ctx.symbol_names_len += name_size + 1;
     return idx;
 }
 
@@ -79,8 +79,8 @@ typedef struct {
     int64_t value;
 } Int;
 Int visit_int() {
-    Span* span = &ctx.token_buf[ctx.token_pos].span;
-    int64_t value = strtol(&ctx.input_buf[span->start], NULL, 10);
+    Span* span = &ctx.tokens[ctx.token_pos].span;
+    int64_t value = strtol(&ctx.input[span->start], NULL, 10);
     Int i = {.ok = true, .span = span, .value = value};
     ctx.token_pos++;
     return i;
@@ -94,16 +94,16 @@ Expr visit_string() {
     uint8_t str_buf[1 << 10] = {0};
     size_t str_len = 0;
     while (true) {
-        Span span = ctx.token_buf[ctx.token_pos].span;
-        if (ctx.token_buf[ctx.token_pos].type == DQUOTE) {
+        Span span = ctx.tokens[ctx.token_pos].span;
+        if (ctx.tokens[ctx.token_pos].type == DQUOTE) {
             break;
-        } else if (ctx.token_buf[ctx.token_pos].type == STRING_PART) {
-            memcpy(&str_buf[str_len], &ctx.input_buf[span.start], span.len);
+        } else if (ctx.tokens[ctx.token_pos].type == STRING_PART) {
+            memcpy(&str_buf[str_len], &ctx.input[span.start], span.len);
             str_len += span.len;
             ctx.token_pos++;
-        } else if (ctx.token_buf[ctx.token_pos].type == ESCAPE) {
-            size_t start = ctx.token_buf[ctx.token_pos].span.start;
-            uint8_t c = ctx.input_buf[start + 1];
+        } else if (ctx.tokens[ctx.token_pos].type == ESCAPE) {
+            size_t start = ctx.tokens[ctx.token_pos].span.start;
+            uint8_t c = ctx.input[start + 1];
             uint8_t b;
             switch (c) {
                 case 'a': b = 0x07; break;
@@ -127,18 +127,18 @@ Expr visit_string() {
             ctx.token_pos++;
         } else {
             fprintf(stderr, "unexpected token when parsing string at %zu: %s\n",
-                    ctx.token_buf[ctx.token_pos].span.start,
-                    token_name[ctx.token_buf[ctx.token_pos].type]);
+                    ctx.tokens[ctx.token_pos].span.start,
+                    token_name[ctx.tokens[ctx.token_pos].type]);
             return string;
         }
     }
     ctx.token_pos++;
 
     char symbol_name_buf[16] = {0};
-    size_t symbol_name_size = sprintf(symbol_name_buf, ".str%zu", ctx.symbols_local_size);
+    size_t symbol_name_size = sprintf(symbol_name_buf, ".str%zu", ctx.symbols_local_len);
 
     size_t symbol_idx =
-        symbol_add_rodata(symbol_name_buf, symbol_name_size, ctx.rodata_size, str_len);
+        symbol_add_rodata(symbol_name_buf, symbol_name_size, ctx.rodata_len, str_len);
     string.operand = (Operand){
         .rvalue =
             {
@@ -146,8 +146,8 @@ Expr visit_string() {
                 .memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx},
             },
     };
-    memcpy(&ctx.rodata_buf[ctx.rodata_size], &str_buf, str_len);
-    ctx.rodata_size += str_len + 1;
+    memcpy(&ctx.rodata[ctx.rodata_len], &str_buf, str_len);
+    ctx.rodata_len += str_len + 1;
 
     string.ok = true;
     return string;
@@ -157,7 +157,7 @@ Expr visit_char() {
     Expr c = {};
     ctx.token_pos++;
     // TODO: escape
-    c.operand.rvalue = immediate(ctx.input_buf[ctx.token_buf[ctx.token_pos].span.start]);
+    c.operand.rvalue = immediate(ctx.input[ctx.tokens[ctx.token_pos].span.start]);
     ctx.token_pos++;
     ctx.token_pos++;
     c.ok = true;
@@ -169,7 +169,7 @@ typedef struct {
     Span span;
 } Ident;
 Ident visit_ident() {
-    Ident ident = {.ok = true, .span = ctx.token_buf[ctx.token_pos].span};
+    Ident ident = {.ok = true, .span = ctx.tokens[ctx.token_pos].span};
     ctx.token_pos++;
     return ident;
 }
@@ -185,7 +185,7 @@ Type visit_type() {
     type.name = visit_ident();
     if (!type.name.ok) return type;
 
-    if (ctx.token_buf[ctx.token_pos].type == ASTERISK) {
+    if (ctx.tokens[ctx.token_pos].type == ASTERISK) {
         ctx.token_pos++;
         type.ptr = true;
     }
@@ -197,15 +197,15 @@ Type visit_type() {
 // | ">="
 Operator visit_op_infix() {
     Operator op = {.type = INFIX};
-    switch (ctx.token_buf[ctx.token_pos].type) {
+    switch (ctx.tokens[ctx.token_pos].type) {
         case EQUALS: {
             ctx.token_pos++;
-            if (ctx.token_buf[ctx.token_pos].type == EQUALS) {
+            if (ctx.tokens[ctx.token_pos].type == EQUALS) {
                 ctx.token_pos++;
                 op.tag = OP_EQ;
                 return op;
             }
-            if (ctx.token_buf[ctx.token_pos].type == EXCL) {
+            if (ctx.tokens[ctx.token_pos].type == EXCL) {
                 ctx.token_pos++;
                 op.tag = OP_NEQ;
                 return op;
@@ -225,7 +225,7 @@ Operator visit_op_infix() {
         }
         case AMPERSAND: {
             ctx.token_pos++;
-            if (ctx.token_buf[ctx.token_pos].type == AMPERSAND) {
+            if (ctx.tokens[ctx.token_pos].type == AMPERSAND) {
                 ctx.token_pos++;
                 op.tag = OP_AND;
             } else {
@@ -235,7 +235,7 @@ Operator visit_op_infix() {
         }
         case O_ANGLE: {
             ctx.token_pos++;
-            if (ctx.token_buf[ctx.token_pos].type == EQUALS) {
+            if (ctx.tokens[ctx.token_pos].type == EQUALS) {
                 ctx.token_pos++;
                 op.tag = OP_LE;
             } else {
@@ -245,7 +245,7 @@ Operator visit_op_infix() {
         }
         case C_ANGLE: {
             ctx.token_pos++;
-            if (ctx.token_buf[ctx.token_pos].type == EQUALS) {
+            if (ctx.tokens[ctx.token_pos].type == EQUALS) {
                 ctx.token_pos++;
                 op.tag = OP_GE;
             } else {
@@ -255,8 +255,8 @@ Operator visit_op_infix() {
         }
         default:
             fprintf(stderr, "unexpected token when parsing op_infix at %zu: %s\n",
-                    ctx.token_buf[ctx.token_pos].span.start,
-                    token_name[ctx.token_buf[ctx.token_pos].type]);
+                    ctx.tokens[ctx.token_pos].span.start,
+                    token_name[ctx.tokens[ctx.token_pos].type]);
             return op;
     }
 }
@@ -264,7 +264,7 @@ Operator visit_op_infix() {
 // op_prefix = "++" | "--" | "+" | "-" | "&" | "*"
 Operator visit_op_prefix() {
     Operator op = {.type = PREFIX};
-    switch (ctx.token_buf[ctx.token_pos].type) {
+    switch (ctx.tokens[ctx.token_pos].type) {
         case AMPERSAND: {
             ctx.token_pos++;
             op.tag = OP_ADDRESS_OF;
@@ -284,7 +284,7 @@ Operator visit_op_prefix() {
 // op_postfix = "++" | "--" | index
 Operator visit_op_postfix() {
     Operator op = {.type = POSTFIX};
-    switch (ctx.token_buf[ctx.token_pos].type) {
+    switch (ctx.tokens[ctx.token_pos].type) {
         case O_BRACKET: {
             Expr expr = visit_index();
             if (!expr.ok) break;
@@ -293,7 +293,7 @@ Operator visit_op_postfix() {
             break;
         }
         case PLUS: {
-            if (ctx.token_buf[ctx.token_pos + 1].type == PLUS) {
+            if (ctx.tokens[ctx.token_pos + 1].type == PLUS) {
                 ctx.token_pos += 2;
                 op.tag = OP_INCREMENT;
                 break;
@@ -308,8 +308,8 @@ Operator visit_op_postfix() {
 // operand = IDENT | call | INT | string | char | "(" expr ")"
 Expr visit_operand() {
     Expr expr = {};
-    Token t = ctx.token_buf[ctx.token_pos];
-    if (t.type == IDENT && ctx.token_buf[ctx.token_pos + 1].type == O_PAREN) {
+    Token t = ctx.tokens[ctx.token_pos];
+    if (t.type == IDENT && ctx.tokens[ctx.token_pos + 1].type == O_PAREN) {
         Expr call = visit_call();
         if (!call.ok) return expr;
         expr.operand = call.operand;
@@ -362,10 +362,10 @@ bool visit_if() {
     ctx.token_pos++;
 
     asm_cmp(expr.operand.rvalue, immediate(0));
-    size_t else_jmp_pos = ctx.text_size;
+    size_t else_jmp_pos = ctx.text_len;
     asm_canary(6);
 
-    if (ctx.token_buf[ctx.token_pos].type == O_BRACE) {
+    if (ctx.tokens[ctx.token_pos].type == O_BRACE) {
         ok = visit_block();
     } else {
         ok = visit_statement();
@@ -373,28 +373,28 @@ bool visit_if() {
     if (!ok) return false;
 
     size_t end_jmp_pos;
-    if (ctx.token_buf[ctx.token_pos].type == ELSE) {
-        end_jmp_pos = ctx.text_size;
+    if (ctx.tokens[ctx.token_pos].type == ELSE) {
+        end_jmp_pos = ctx.text_len;
         asm_canary(6);
     }
 
-    size_t text_size_bak = ctx.text_size;
-    ctx.text_size = else_jmp_pos;
+    size_t text_size_bak = ctx.text_len;
+    ctx.text_len = else_jmp_pos;
     asm_je(text_size_bak - else_jmp_pos - 6);
-    ctx.text_size = text_size_bak;
+    ctx.text_len = text_size_bak;
 
-    if (ctx.token_buf[ctx.token_pos].type == ELSE) {
+    if (ctx.tokens[ctx.token_pos].type == ELSE) {
         ctx.token_pos++;
-        if (ctx.token_buf[ctx.token_pos].type == O_BRACE) {
+        if (ctx.tokens[ctx.token_pos].type == O_BRACE) {
             ok = visit_block();
         } else {
             ok = visit_statement();
         }
 
-        size_t text_size_bak = ctx.text_size;
-        ctx.text_size = end_jmp_pos;
+        size_t text_size_bak = ctx.text_len;
+        ctx.text_len = end_jmp_pos;
         asm_jmp(text_size_bak - end_jmp_pos - 5);
-        ctx.text_size = text_size_bak;
+        ctx.text_len = text_size_bak;
     }
     if (!ok) return false;
 
@@ -403,7 +403,7 @@ bool visit_if() {
 
 // while = "while" "(" expr ")" (block | statement)
 bool visit_while() {
-    int32_t loop_pos = ctx.text_size;
+    int32_t loop_pos = ctx.text_len;
 
     ctx.token_pos += 2;
     Expr expr = visit_expr();
@@ -411,10 +411,10 @@ bool visit_while() {
     ctx.token_pos++;
 
     asm_cmp(expr.operand.rvalue, immediate(0));
-    size_t je_pos = ctx.text_size;
+    size_t je_pos = ctx.text_len;
     asm_canary(6);
 
-    if (ctx.token_buf[ctx.token_pos].type == O_BRACE) {
+    if (ctx.tokens[ctx.token_pos].type == O_BRACE) {
         bool ok = visit_block();
         if (!ok) return false;
     } else {
@@ -422,12 +422,12 @@ bool visit_while() {
         if (!ok) return false;
     }
 
-    asm_jmp(loop_pos - ctx.text_size - 5);
+    asm_jmp(loop_pos - ctx.text_len - 5);
 
-    size_t text_size_bak = ctx.text_size;
-    ctx.text_size = je_pos;
+    size_t text_size_bak = ctx.text_len;
+    ctx.text_len = je_pos;
     asm_je(text_size_bak - je_pos - 6);
-    ctx.text_size = text_size_bak;
+    ctx.text_len = text_size_bak;
 
     return true;
 }
@@ -447,15 +447,15 @@ Expr visit_call() {
 
     ctx.token_pos++;
     int32_t arg_count = 0;
-    while (ctx.token_pos < ctx.token_size) {
+    while (ctx.token_pos < ctx.tokens_len) {
         Expr expr = visit_expr();
         if (!expr.ok) return call;
-        if (ctx.token_buf[ctx.token_pos].type == SEMI) ctx.token_pos++;
+        if (ctx.tokens[ctx.token_pos].type == SEMI) ctx.token_pos++;
 
         asm_mov(argument_registers[arg_count], expr.operand.rvalue);
         arg_count++;
-        if (ctx.token_buf[ctx.token_pos].type == COMMA) ctx.token_pos++;
-        if (ctx.token_buf[ctx.token_pos].type == C_PAREN) break;
+        if (ctx.tokens[ctx.token_pos].type == COMMA) ctx.token_pos++;
+        if (ctx.tokens[ctx.token_pos].type == C_PAREN) break;
     }
     ctx.token_pos++;
 
@@ -498,22 +498,22 @@ bool visit_statement() {
     assert(expr_registers_busy < 14);
     expr_registers_busy = 0;
 
-    if (ctx.token_buf[ctx.token_pos].type == IF) {
+    if (ctx.tokens[ctx.token_pos].type == IF) {
         bool ok = visit_if();
         if (!ok) return false;
-    } else if (ctx.token_buf[ctx.token_pos].type == WHILE) {
+    } else if (ctx.tokens[ctx.token_pos].type == WHILE) {
         bool ok = visit_while();
         if (!ok) return false;
-    } else if (ctx.token_buf[ctx.token_pos].type == RETURN) {
+    } else if (ctx.tokens[ctx.token_pos].type == RETURN) {
         bool ok = visit_return();
         if (!ok) return false;
     } else {
         size_t token_pos_old = ctx.token_pos;
         if (visit_type().ok) {
             if (visit_ident().ok) {
-                if (ctx.token_buf[ctx.token_pos].type == SEMI ||
-                    ctx.token_buf[ctx.token_pos].type == EQUALS ||
-                    ctx.token_buf[ctx.token_pos].type == O_BRACKET) {
+                if (ctx.tokens[ctx.token_pos].type == SEMI ||
+                    ctx.tokens[ctx.token_pos].type == EQUALS ||
+                    ctx.tokens[ctx.token_pos].type == O_BRACKET) {
                     ctx.token_pos = token_pos_old;
                     bool ok = visit_var_def();
                     if (!ok) return false;
@@ -533,7 +533,7 @@ bool visit_statement() {
 // block = "{" statement* "}"
 bool visit_block() {
     ctx.token_pos++;
-    while (ctx.token_buf[ctx.token_pos].type != C_BRACE) {
+    while (ctx.tokens[ctx.token_pos].type != C_BRACE) {
         bool ok = visit_statement();
         if (!ok) return ok;
     }
@@ -550,7 +550,7 @@ typedef struct {
     Operand operand;
 } Param;
 Param visit_param(size_t param_index) {
-    if (ctx.token_buf[ctx.token_pos].type == PERIOD) {
+    if (ctx.tokens[ctx.token_pos].type == PERIOD) {
         ctx.token_pos += 3;
         return (Param){
             .ok = true,
@@ -565,7 +565,7 @@ Param visit_param(size_t param_index) {
     if (!param.name.ok) return param;
 
     param.operand = stack_alloc(8);
-    ctx.symbols_buf[ctx.symbols_size++] = (Symbol){
+    ctx.symbols[ctx.symbols_len++] = (Symbol){
         .span = param.name.span,
         .operand = param.operand,
     };
@@ -577,7 +577,7 @@ Param visit_param(size_t param_index) {
 
 // func_def = type IDENT "(" param ("," param)* ")" (";" | block)
 bool visit_func_def() {
-    size_t symbol_pos = ctx.text_size;
+    size_t symbol_pos = ctx.text_len;
     Ident type_ret = visit_ident();
     if (!type_ret.ok) return type_ret.ok;
     Ident name = visit_ident();
@@ -585,8 +585,8 @@ bool visit_func_def() {
 
     // look ahead to decide whether this is function declaration or impl
     size_t param_token_pos = ctx.token_pos;
-    while (ctx.token_pos < ctx.token_size && !(ctx.token_buf[ctx.token_pos].type == SEMI ||
-                                               ctx.token_buf[ctx.token_pos].type == C_PAREN)) {
+    while (ctx.token_pos < ctx.tokens_len &&
+           !(ctx.tokens[ctx.token_pos].type == SEMI || ctx.tokens[ctx.token_pos].type == C_PAREN)) {
         ctx.token_pos++;
     }
     ctx.token_pos++;
@@ -594,10 +594,10 @@ bool visit_func_def() {
     // for push/pop
     size_t stack_prealloc = 1024;
 
-    if (ctx.token_buf[ctx.token_pos].type == SEMI) {
+    if (ctx.tokens[ctx.token_pos].type == SEMI) {
         symbol_add_global(name.span, symbol_pos, false);
         ctx.token_pos++;
-    } else if (ctx.token_buf[ctx.token_pos].type == O_BRACE) {
+    } else if (ctx.tokens[ctx.token_pos].type == O_BRACE) {
         symbol_add_global(name.span, symbol_pos, true);
         stack_push();
 
@@ -614,10 +614,10 @@ bool visit_func_def() {
         ctx.token_pos = param_token_pos;
         ctx.token_pos++;
         size_t param_index = 0;
-        while (ctx.token_buf[ctx.token_pos].type != C_PAREN) {
+        while (ctx.tokens[ctx.token_pos].type != C_PAREN) {
             Param param = visit_param(param_index);
             if (!param.ok) return param.ok;
-            if (ctx.token_buf[ctx.token_pos].type == COMMA) ctx.token_pos++;
+            if (ctx.tokens[ctx.token_pos].type == COMMA) ctx.token_pos++;
             param_index++;
         }
         ctx.token_pos++;
@@ -637,8 +637,7 @@ bool visit_func_def() {
         stack_pop();
     } else {
         fprintf(stderr, "unexpected token when parsing func_def at %zu: %s\n",
-                ctx.token_buf[ctx.token_pos].span.start,
-                token_name[ctx.token_buf[ctx.token_pos].type]);
+                ctx.tokens[ctx.token_pos].span.start, token_name[ctx.tokens[ctx.token_pos].type]);
         return false;
     }
 
@@ -671,21 +670,21 @@ bool visit_var_def() {
     if (!name.ok) return false;
 
     int64_t array_size = 0;
-    if (ctx.token_buf[ctx.token_pos].type == O_BRACKET) {
+    if (ctx.tokens[ctx.token_pos].type == O_BRACKET) {
         Int size = visit_array_size();
         if (!size.ok) return false;
         array_size = size.value;
     }
 
     Expr expr = {};
-    if (ctx.token_buf[ctx.token_pos].type == EQUALS) {
+    if (ctx.tokens[ctx.token_pos].type == EQUALS) {
         ctx.token_pos++;
         expr = visit_expr();
         if (!expr.ok) return false;
     }
 
-    if (ctx.stack_size == 1) {
-        symbol_add_global(name.span, ctx.text_size, true);
+    if (ctx.stack_len == 1) {
+        symbol_add_global(name.span, ctx.text_len, true);
         if (expr.ok) {
             fprintf(stderr, "TODO global assign\n");
         }
@@ -704,19 +703,19 @@ bool visit_var_def() {
 // program = (var_def | func_def)+
 bool visit_program() {
     stack_push();
-    while (ctx.token_pos < ctx.token_size) {
+    while (ctx.token_pos < ctx.tokens_len) {
         // TODO: dry-parse type to figure out correct offset
-        if (ctx.token_buf[ctx.token_pos + 2].type == O_PAREN ||
-            ctx.token_buf[ctx.token_pos + 3].type == O_PAREN) {
+        if (ctx.tokens[ctx.token_pos + 2].type == O_PAREN ||
+            ctx.tokens[ctx.token_pos + 3].type == O_PAREN) {
             bool ok = visit_func_def();
             if (!ok) return ok;
-        } else if (ctx.token_buf[ctx.token_pos + 2].type == SEMI) {
+        } else if (ctx.tokens[ctx.token_pos + 2].type == SEMI) {
             bool ok = visit_var_def();
             if (!ok) return ok;
         } else {
             fprintf(stderr, "unexpected token when parsing program at %zu: %s\n",
-                    ctx.token_buf[ctx.token_pos].span.start,
-                    token_name[ctx.token_buf[ctx.token_pos].type]);
+                    ctx.tokens[ctx.token_pos].span.start,
+                    token_name[ctx.tokens[ctx.token_pos].type]);
             return false;
         }
     }

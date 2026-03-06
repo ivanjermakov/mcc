@@ -216,53 +216,83 @@ typedef struct {
 } SymbolRelocation;
 
 typedef struct {
-    Token token_buf[1 << 10];
-    size_t token_size;
-    size_t token_offset;
+    /**
+     * Source code, compiler input
+     */
+    char input[1 << 10];
+    /**
+     * Length of `input`
+     */
+    size_t input_len;
 
     bool inside_string;
     bool inside_char;
 
-    char input_buf[1 << 10];
-    size_t input_size;
+    /**
+     * Lexer's current position in `input`
+     */
+    size_t token_offset;
 
+    /**
+     * Array of tokens, result of tokenization
+     */
+    Token tokens[1 << 10];
+    /**
+     * Total length of `tokens`
+     */
+    size_t tokens_len;
+
+    /**
+     * Parser's current position in `tokens`
+     */
     size_t token_pos;
 
-    uint8_t text_buf[1 << 10];
-    size_t text_size;
-    uint8_t rodata_buf[1 << 10];
-    size_t rodata_size;
-    uint8_t symbol_names_buf[1 << 10];
-    size_t symbol_names_size;
-
-    ElfSymbolEntry symbols_local_buf[1 << 10];
-    size_t symbols_local_size;
+    /**
+     * .text ELF file section
+     */
+    uint8_t text[1 << 10];
+    size_t text_len;
+    /**
+     * .rodata ELF file section
+     */
+    uint8_t rodata[1 << 10];
+    size_t rodata_len;
+    /**
+     * .strtab ELF file section
+     */
+    uint8_t symbol_names[1 << 10];
+    size_t symbol_names_len;
+    /**
+     * .symtab ELF file section
+     */
+    ElfSymbolEntry symbols_local[1 << 10];
+    size_t symbols_local_len;
 
     /**
      * Flat array of symbols that can be resolved by name
      */
-    Symbol symbols_buf[1 << 10];
-    size_t symbols_size;
+    Symbol symbols[1 << 10];
+    size_t symbols_len;
     /**
      * `symbols_buf[stack[n]]` is the first symbol in stack scope `n`
      */
     Scope stack[1 << 10];
-    size_t stack_size;
+    size_t stack_len;
 
     /**
      * RSP offset in a current function
      */
     int32_t stack_offset;
-    SymbolRelocation global_relocations_buf[1 << 10];
-    size_t global_relocations_size;
+    SymbolRelocation global_relocations[1 << 10];
+    size_t global_relocations_len;
 
-    ElfRelocationEntry local_relocations_buf[1 << 10];
-    size_t local_relocations_size;
+    ElfRelocationEntry local_relocations[1 << 10];
+    size_t local_relocations_len;
 } Context;
 
 Context ctx = {
-    .symbol_names_size = 1,
-    .symbols_local_size = 1,
+    .symbol_names_len = 1,
+    .symbols_local_len = 1,
 };
 
 Operand_ immediate(int64_t value) {
@@ -270,24 +300,24 @@ Operand_ immediate(int64_t value) {
 }
 
 void stack_push() {
-    Scope last = ctx.stack[ctx.stack_size];
-    ctx.stack[ctx.stack_size++] = (Scope){
-        .symbols_start = ctx.symbols_size,
+    Scope last = ctx.stack[ctx.stack_len];
+    ctx.stack[ctx.stack_len++] = (Scope){
+        .symbols_start = ctx.symbols_len,
         .bp_offset = last.bp_offset,
     };
 }
 
 void stack_pop() {
-    ctx.stack_size--;
-    ctx.symbols_size = ctx.stack[ctx.stack_size].symbols_start;
+    ctx.stack_len--;
+    ctx.symbols_len = ctx.stack[ctx.stack_len].symbols_start;
 }
 
 size_t stack_scope_size(size_t i) {
-    return (i == ctx.stack_size - 1 ? ctx.symbols_size : ctx.stack[i + 1].symbols_start) -
+    return (i == ctx.stack_len - 1 ? ctx.symbols_len : ctx.stack[i + 1].symbols_start) -
            ctx.stack[i].symbols_start;
 }
 
 int32_t span_cmp(Span a, Span b) {
     if (a.len != b.len) return a.len - b.len;
-    return strncmp(&ctx.input_buf[a.start], &ctx.input_buf[b.start], a.len);
+    return strncmp(&ctx.input[a.start], &ctx.input[b.start], a.len);
 }

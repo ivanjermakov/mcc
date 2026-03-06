@@ -20,16 +20,16 @@ bool is_ident(char c, size_t len) {
 Token next_token() {
     Token token = {};
     token.span.start = ctx.token_offset;
-    if (ctx.token_offset >= ctx.input_size) return token;
+    if (ctx.token_offset >= ctx.input_len) return token;
 
-    if (ctx.input_buf[ctx.token_offset] == '"' && !ctx.inside_char) {
+    if (ctx.input[ctx.token_offset] == '"' && !ctx.inside_char) {
         ctx.inside_string = !ctx.inside_string;
         token.span.len = 1;
         token.type = DQUOTE;
         ctx.token_offset += token.span.len;
         return token;
     }
-    if (ctx.input_buf[ctx.token_offset] == '\'' && !ctx.inside_string) {
+    if (ctx.input[ctx.token_offset] == '\'' && !ctx.inside_string) {
         ctx.inside_char = !ctx.inside_char;
         token.span.len = 1;
         token.type = QUOTE;
@@ -37,9 +37,9 @@ Token next_token() {
         return token;
     }
     if (ctx.inside_string || ctx.inside_char) {
-        if (ctx.input_buf[ctx.token_offset] == '\\') {
+        if (ctx.input[ctx.token_offset] == '\\') {
             // TODO: wrap str_len++ into advance() to check for EOF
-            uint8_t c = ctx.input_buf[ctx.token_offset];
+            uint8_t c = ctx.input[ctx.token_offset];
             if (is_digit(c) || c == 'x' || c == 'u' || c == 'U') {
                 fprintf(stderr, "TODO byte escape sequence\n");
                 return token;
@@ -52,9 +52,9 @@ Token next_token() {
     }
     if (ctx.inside_string) {
         size_t str_len = 0;
-        while (ctx.token_offset < ctx.input_size) {
-            if (ctx.input_buf[ctx.token_offset + str_len] == '"' ||
-                ctx.input_buf[ctx.token_offset + str_len] == '\\') {
+        while (ctx.token_offset < ctx.input_len) {
+            if (ctx.input[ctx.token_offset + str_len] == '"' ||
+                ctx.input[ctx.token_offset + str_len] == '\\') {
                 token.span.len = str_len;
                 token.type = STRING_PART;
                 ctx.token_offset += token.span.len;
@@ -72,16 +72,16 @@ Token next_token() {
         return token;
     }
 
-    if (ctx.input_buf[ctx.token_offset] == '/' && ctx.input_buf[ctx.token_offset + 1] == '/') {
-        while (ctx.token_offset < ctx.input_size && ctx.input_buf[ctx.token_offset] != '\n') {
+    if (ctx.input[ctx.token_offset] == '/' && ctx.input[ctx.token_offset + 1] == '/') {
+        while (ctx.token_offset < ctx.input_len && ctx.input[ctx.token_offset] != '\n') {
             ctx.token_offset++;
         }
         return next_token();
     }
 
     size_t skip = 0;
-    if (ctx.token_offset < ctx.input_size && (!is_printable(ctx.input_buf[ctx.token_offset]) ||
-                                              ctx.input_buf[ctx.token_offset] == ' ')) {
+    if (ctx.token_offset < ctx.input_len &&
+        (!is_printable(ctx.input[ctx.token_offset]) || ctx.input[ctx.token_offset] == ' ')) {
         skip++;
     }
     ctx.token_offset += skip;
@@ -90,7 +90,7 @@ Token next_token() {
     for (size_t i = 0; i < token_literal_size; i++) {
         const char* t = token_literal[i];
         if (t == NULL) continue;
-        if (strncmp(&ctx.input_buf[ctx.token_offset], t, strlen(t)) == 0) {
+        if (strncmp(&ctx.input[ctx.token_offset], t, strlen(t)) == 0) {
             token.span.len = strlen(t);
             token.type = (TokenType)i;
             ctx.token_offset += token.span.len;
@@ -99,8 +99,8 @@ Token next_token() {
     }
 
     size_t ident_len = 0;
-    while (ctx.token_offset < ctx.input_size &&
-           is_ident(ctx.input_buf[ctx.token_offset + ident_len], ident_len)) {
+    while (ctx.token_offset < ctx.input_len &&
+           is_ident(ctx.input[ctx.token_offset + ident_len], ident_len)) {
         ident_len++;
     }
     if (ident_len > 0) {
@@ -111,9 +111,9 @@ Token next_token() {
     }
 
     size_t int_len = 0;
-    if (is_digit(ctx.input_buf[ctx.token_offset])) {
-        while (ctx.token_offset < ctx.input_size &&
-               is_digit(ctx.input_buf[ctx.token_offset + int_len])) {
+    if (is_digit(ctx.input[ctx.token_offset])) {
+        while (ctx.token_offset < ctx.input_len &&
+               is_digit(ctx.input[ctx.token_offset + int_len])) {
             int_len++;
         }
         token.span.len = int_len;
@@ -122,6 +122,6 @@ Token next_token() {
         return token;
     }
 
-    printf("unknown token '%c' at %zu\n", ctx.input_buf[ctx.token_offset], ctx.token_offset);
+    printf("unknown token '%c' at %zu\n", ctx.input[ctx.token_offset], ctx.token_offset);
     return token;
 }
