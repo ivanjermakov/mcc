@@ -23,10 +23,10 @@ typedef struct {
 void operand_emit(ExprToken* o) {
     if (!o->emitted) {
         o->emitted = true;
-        size_t token_pos_bk = token_pos;
-        token_pos = o->token_pos;
+        size_t token_pos_bk = ctx.token_pos;
+        ctx.token_pos = o->token_pos;
         o->operand = visit_operand().operand;
-        token_pos = token_pos_bk;
+        ctx.token_pos = token_pos_bk;
     }
 }
 
@@ -41,8 +41,10 @@ bool shunting_yard(ExprToken out_queue[], size_t* out_queue_size) {
     size_t op_stack_size = 0;
 
     bool infix_postfix_time = false;
-    while (token_buf[token_pos].type != SEMI && token_buf[token_pos].type != COMMA &&
-           token_buf[token_pos].type != C_PAREN && token_buf[token_pos].type != C_BRACKET) {
+    while (ctx.token_buf[ctx.token_pos].type != SEMI &&
+           ctx.token_buf[ctx.token_pos].type != COMMA &&
+           ctx.token_buf[ctx.token_pos].type != C_PAREN &&
+           ctx.token_buf[ctx.token_pos].type != C_BRACKET) {
         ExprToken expr_token = {};
         if (infix_postfix_time) {
             Operator op = visit_op_postfix();
@@ -60,12 +62,12 @@ bool shunting_yard(ExprToken out_queue[], size_t* out_queue_size) {
                 expr_token.op = op;
             } else {
                 // postpone operand emit to have more flexibility in visit_expr
-                // visit to advance token_pos, record operand_pos to "replay" emit later
-                expr_token.token_pos = token_pos;
+                // visit to advance ctx.token_pos, record operand_pos to "replay" emit later
+                expr_token.token_pos = ctx.token_pos;
 
-                size_t text_pos = text_size;
+                size_t text_pos = ctx.text_size;
                 Expr operand = visit_operand();
-                text_size = text_pos;
+                ctx.text_size = text_pos;
 
                 if (!operand.ok) return false;
                 out_queue[(*out_queue_size)++] = expr_token;
@@ -107,9 +109,9 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
         if (op.type == INFIX) {
             // some operators require operands to be emitted left-to-right
             size_t o2_pos = *pos;
-            size_t text_pos = text_size;
+            size_t text_pos = ctx.text_size;
             visit_expr_(expr_stack, pos);
-            text_size = text_pos;
+            ctx.text_size = text_pos;
 
             Operand o1 = visit_expr_(expr_stack, pos).operand;
             size_t end_pos = *pos;
@@ -121,7 +123,7 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
             if (op.tag == OP_AND) {
                 asm_mov(out.rvalue, immediate(0));
                 asm_cmp(o1.rvalue, immediate(0));
-                sc_je_pos = text_size;
+                sc_je_pos = ctx.text_size;
                 asm_canary(6);
             }
 
@@ -181,10 +183,10 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     asm_mov(out.rvalue, o2.rvalue);
 
                     // patch short circuit je
-                    size_t text_size_bak = text_size;
-                    text_size = sc_je_pos;
+                    size_t text_size_bak = ctx.text_size;
+                    ctx.text_size = sc_je_pos;
                     asm_je(text_size_bak - sc_je_pos - 6);
-                    text_size = text_size_bak;
+                    ctx.text_size = text_size_bak;
 
                     break;
                 }

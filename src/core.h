@@ -45,11 +45,13 @@ typedef enum {
     PERIOD,
     PERCENT,
 } TokenType;
+
 const char* token_literal[] = {
     NULL, NULL, NULL, NULL, NULL, NULL,   "#",     ";",      "'", "\"", "{", "}", "(", ")", "[",
     "]",  ",",  "*",  "&",  "if", "else", "while", "return", "+", "=",  "<", ">", "!", ".", "%",
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
+
 const char* token_name[] = {"NONE",      "IDENT",   "INT",      "STRING_PART", "CHAR",
                             "ESCAPE",    "HASH",    "SEMI",     "QUOTE",       "DQUOTE",
                             "O_BRACE",   "C_BRACE", "O_PAREN",  "C_PAREN",     "O_BRACKET",
@@ -61,28 +63,6 @@ typedef struct {
     Span span;
     TokenType type;
 } Token;
-
-Token token_buf[1 << 10];
-size_t token_size = 0;
-size_t token_offset = 0;
-
-bool inside_string = false;
-bool inside_char = false;
-
-char input_buf[1 << 10];
-size_t input_size = 0;
-
-size_t token_pos = 0;
-
-uint8_t text_buf[1 << 10];
-size_t text_size = 0;
-uint8_t rodata_buf[1 << 10];
-size_t rodata_size = 0;
-uint8_t symbol_names_buf[1 << 10];
-size_t symbol_names_size = 1;
-
-ElfSymbolEntry symbols_local_buf[1 << 10];
-size_t symbols_local_size = 1;
 
 typedef enum {
     REGISTER = 1,
@@ -126,10 +106,6 @@ typedef struct {
     Operand_ lvalue;
     Operand_ rvalue;
 } Operand;
-
-Operand_ immediate(int64_t value) {
-    return (Operand_){.tag = IMMEDIATE, .immediate = {.value = value}};
-}
 
 typedef struct {
     bool ok;
@@ -228,45 +204,6 @@ typedef struct {
     int64_t bp_offset;
 } Scope;
 
-/**
- * Flat array of symbols that can be resolved by name
- */
-Symbol symbols_buf[1 << 10];
-size_t symbols_size = 0;
-/**
- * `symbols_buf[stack[n]]` is the first symbol in stack scope `n`
- */
-Scope stack[1 << 10];
-size_t stack_size = 0;
-
-/**
- * RSP offset in a current function
- */
-int32_t stack_offset = 0;
-
-void stack_push() {
-    Scope last = stack[stack_size];
-    stack[stack_size++] = (Scope){
-        .symbols_start = symbols_size,
-        .bp_offset = last.bp_offset,
-    };
-}
-
-void stack_pop() {
-    stack_size--;
-    symbols_size = stack[stack_size].symbols_start;
-}
-
-size_t stack_scope_size(size_t i) {
-    return (i == stack_size - 1 ? symbols_size : stack[i + 1].symbols_start) -
-           stack[i].symbols_start;
-}
-
-int32_t span_cmp(Span a, Span b) {
-    if (a.len != b.len) return a.len - b.len;
-    return strncmp(&input_buf[a.start], &input_buf[b.start], a.len);
-}
-
 typedef enum {
     PC32 = 2,
     PLT32 = 4,
@@ -278,8 +215,79 @@ typedef struct {
     size_t offset;
 } SymbolRelocation;
 
-SymbolRelocation global_relocations_buf[1 << 10];
-size_t global_relocations_size = 0;
+typedef struct {
+    Token token_buf[1 << 10];
+    size_t token_size;
+    size_t token_offset;
 
-ElfRelocationEntry local_relocations_buf[1 << 10];
-size_t local_relocations_size = 0;
+    bool inside_string;
+    bool inside_char;
+
+    char input_buf[1 << 10];
+    size_t input_size;
+
+    size_t token_pos;
+
+    uint8_t text_buf[1 << 10];
+    size_t text_size;
+    uint8_t rodata_buf[1 << 10];
+    size_t rodata_size;
+    uint8_t symbol_names_buf[1 << 10];
+    size_t symbol_names_size;
+
+    ElfSymbolEntry symbols_local_buf[1 << 10];
+    size_t symbols_local_size;
+
+    /**
+     * Flat array of symbols that can be resolved by name
+     */
+    Symbol symbols_buf[1 << 10];
+    size_t symbols_size;
+    /**
+     * `symbols_buf[stack[n]]` is the first symbol in stack scope `n`
+     */
+    Scope stack[1 << 10];
+    size_t stack_size;
+
+    /**
+     * RSP offset in a current function
+     */
+    int32_t stack_offset;
+    SymbolRelocation global_relocations_buf[1 << 10];
+    size_t global_relocations_size;
+
+    ElfRelocationEntry local_relocations_buf[1 << 10];
+    size_t local_relocations_size;
+} Context;
+
+Context ctx = {
+    .symbol_names_size = 1,
+    .symbols_local_size = 1,
+};
+
+Operand_ immediate(int64_t value) {
+    return (Operand_){.tag = IMMEDIATE, .immediate = {.value = value}};
+}
+
+void stack_push() {
+    Scope last = ctx.stack[ctx.stack_size];
+    ctx.stack[ctx.stack_size++] = (Scope){
+        .symbols_start = ctx.symbols_size,
+        .bp_offset = last.bp_offset,
+    };
+}
+
+void stack_pop() {
+    ctx.stack_size--;
+    ctx.symbols_size = ctx.stack[ctx.stack_size].symbols_start;
+}
+
+size_t stack_scope_size(size_t i) {
+    return (i == ctx.stack_size - 1 ? ctx.symbols_size : ctx.stack[i + 1].symbols_start) -
+           ctx.stack[i].symbols_start;
+}
+
+int32_t span_cmp(Span a, Span b) {
+    if (a.len != b.len) return a.len - b.len;
+    return strncmp(&ctx.input_buf[a.start], &ctx.input_buf[b.start], a.len);
+}
