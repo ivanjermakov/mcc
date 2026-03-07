@@ -319,7 +319,7 @@ Expr visit_operand() {
         Symbol* symbol = symbol_find(ident.span);
         if (symbol == NULL) return expr;
         if (symbol->count > 0) {
-            Operand tmp = {.rvalue = expr_registers[expr_registers_busy++],
+            Operand tmp = {.rvalue = expr_registers[ctx.expr_registers_busy++],
                            .lvalue = symbol->operand.lvalue};
             asm_lea(tmp.rvalue, symbol->operand.rvalue);
             expr.operand = tmp;
@@ -495,8 +495,8 @@ bool visit_return() {
 
 // statement = if | while | (expr ";") | return | var_def
 bool visit_statement() {
-    assert(expr_registers_busy < 14);
-    expr_registers_busy = 0;
+    assert(ctx.expr_registers_busy < 14);
+    ctx.expr_registers_busy = 0;
 
     if (ctx.tokens[ctx.token_pos].type == IF) {
         bool ok = visit_if();

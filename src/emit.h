@@ -20,7 +20,6 @@ const Operand_ R15 = {.tag = REGISTER, .reg = {.i = 15, .size = 64}};
 
 Operand_ expr_registers[] = {RAX, RCX, RDX, RBX, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15};
 size_t expr_registers_size = sizeof expr_registers / sizeof expr_registers[0];
-size_t expr_registers_busy = 0;
 Operand_ argument_registers[] = {RDI, RSI, RDX, RCX, R8, R9};
 Operand_ non_volatile_registers[] = {RBX, RSI, RDI, RBP, R8, R9, R10, R11, R12, R13, R14, R15};
 size_t non_volatile_registers_size =
@@ -166,7 +165,7 @@ void asm_mov(Operand_ a, Operand_ b) {
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
         if (a.reg.indirect) {
-            Operand_ tmp = expr_registers[expr_registers_busy];
+            Operand_ tmp = expr_registers[ctx.expr_registers_busy];
             asm_mov(tmp, b);
             asm_mov(a, tmp);
             return;
@@ -206,13 +205,13 @@ void asm_mov(Operand_ a, Operand_ b) {
         return;
     }
     if (a.tag == MEMORY && a.memory.mode == REL_RBP && b.tag == IMMEDIATE) {
-        Operand_ tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[ctx.expr_registers_busy];
         asm_mov(tmp, b);
         asm_mov(a, tmp);
         return;
     }
     if (a.tag == MEMORY && b.tag == MEMORY) {
-        Operand_ tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[ctx.expr_registers_busy];
         asm_mov(tmp, b);
         asm_mov(a, tmp);
         return;
@@ -230,14 +229,14 @@ void asm_add(Operand_ a, Operand_ b) {
     }
     if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
         (a.tag == MEMORY && b.tag == MEMORY)) {
-        Operand_ tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[ctx.expr_registers_busy];
         asm_mov(tmp, b);
         asm_add(a, tmp);
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
         if (a.reg.indirect) {
-            Operand_ tmp = expr_registers[expr_registers_busy];
+            Operand_ tmp = expr_registers[ctx.expr_registers_busy];
             asm_mov(tmp, b);
             asm_add(a, tmp);
             return;
@@ -279,14 +278,14 @@ void asm_sub(Operand_ a, Operand_ b) {
     }
     if ((a.tag == REGISTER && b.tag == IMMEDIATE && !immediate_fits_i32(b.immediate)) ||
         (a.tag == MEMORY && b.tag == MEMORY)) {
-        Operand_ tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[ctx.expr_registers_busy];
         asm_mov(tmp, b);
         asm_sub(a, tmp);
         return;
     }
     if (a.tag == REGISTER && b.tag == IMMEDIATE) {
         if (a.reg.indirect) {
-            Operand_ tmp = expr_registers[expr_registers_busy];
+            Operand_ tmp = expr_registers[ctx.expr_registers_busy];
             asm_mov(tmp, b);
             asm_sub(a, tmp);
             return;
@@ -379,14 +378,14 @@ void asm_jmp(int32_t rel) {
 void asm_cmp(Operand_ a, Operand_ b) {
     Operand_ tmp = b;
     if (a.tag == IMMEDIATE) {
-        tmp = expr_registers[expr_registers_busy++];
+        tmp = expr_registers[ctx.expr_registers_busy++];
         asm_mov(tmp, a);
         asm_cmp(tmp, b);
-        expr_registers_busy--;
+        ctx.expr_registers_busy--;
         return;
     }
     if (b.tag != REGISTER) {
-        tmp = expr_registers[expr_registers_busy];
+        tmp = expr_registers[ctx.expr_registers_busy];
         asm_mov(tmp, b);
     }
     if (a.tag == REGISTER) {
@@ -461,7 +460,7 @@ void asm_setg(Operand_ a) {
 
 void asm_idiv(Operand_ a) {
     if (a.tag == IMMEDIATE) {
-        Operand_ tmp = expr_registers[expr_registers_busy];
+        Operand_ tmp = expr_registers[ctx.expr_registers_busy];
         asm_mov(tmp, a);
         asm_idiv(tmp);
         return;

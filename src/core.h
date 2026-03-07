@@ -288,6 +288,8 @@ typedef struct {
 
     ElfRelocationEntry local_relocations[1 << 10];
     size_t local_relocations_len;
+
+    size_t expr_registers_busy;
 } Context;
 
 Context ctx = {

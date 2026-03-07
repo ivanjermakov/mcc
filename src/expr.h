@@ -115,7 +115,7 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
             Operand o1 = visit_expr_(expr_stack, pos).operand;
             size_t end_pos = *pos;
 
-            Operand out = {.rvalue = expr_registers[expr_registers_busy++]};
+            Operand out = {.rvalue = expr_registers[ctx.expr_registers_busy++]};
             expr.operand = out;
 
             size_t sc_je_pos;
@@ -225,11 +225,11 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
             switch (op.tag) {
                 case OP_DEREFERENCE: {
                     if (o.rvalue.tag == MEMORY) {
-                        res.lvalue = expr_registers[expr_registers_busy++];
+                        res.lvalue = expr_registers[ctx.expr_registers_busy++];
                         res.lvalue.reg.indirect = true;
                         asm_mov(res.lvalue, o.rvalue);
 
-                        res.rvalue = expr_registers[expr_registers_busy++];
+                        res.rvalue = expr_registers[ctx.expr_registers_busy++];
                         asm_mov(res.rvalue, res.lvalue);
 
                         expr.operand = res;
@@ -241,7 +241,7 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_ADDRESS_OF: {
-                    Operand_ tmp = expr_registers[expr_registers_busy++];
+                    Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
                     asm_lea(tmp, o.rvalue);
                     res.rvalue = tmp;
                     expr.operand = res;
@@ -259,7 +259,7 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                 case OP_INDEX: {
                     Operand idx = op.operand;
 
-                    Operand_ ptr = expr_registers[expr_registers_busy++];
+                    Operand_ ptr = expr_registers[ctx.expr_registers_busy++];
                     asm_mov(ptr, idx.rvalue);
                     asm_add(ptr, o.rvalue);
 
@@ -281,11 +281,11 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                         assert(false);
                         return (Expr){};
                     }
-                    Operand_ tmp = expr_registers[expr_registers_busy++];
+                    Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
                     asm_mov(tmp, o.rvalue);
                     asm_add(tmp, immediate(1));
                     asm_mov(o.lvalue, tmp);
-                    expr_registers_busy--;
+                    ctx.expr_registers_busy--;
                     break;
                 }
                 default: {
