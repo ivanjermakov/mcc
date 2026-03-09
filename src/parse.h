@@ -335,7 +335,7 @@ Expr visit_operand() {
                 .lvalue = expr_registers[ctx.expr_registers_busy++],
                 .rvalue = expr_registers[ctx.expr_registers_busy++],
             };
-            asm_lea(tmp.lvalue, rel);
+            asm_mov(tmp.lvalue, rel);
             tmp.lvalue.reg.indirect = true;
             asm_mov(tmp.rvalue, tmp.lvalue);
             expr.operand = tmp;

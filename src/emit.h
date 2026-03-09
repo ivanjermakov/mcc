@@ -114,20 +114,20 @@ void asm_lea(Operand_ a, Operand_ b) {
         assert(false);
         return;
     }
-    if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_LOCAL) {
-        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
-        ctx.text[ctx.text_len++] = 0x8D;
-        ctx.text[ctx.text_len++] = modrm(0, a.reg.i & 0b111, RM_DI);
-        relocation_add_local(PC32, b.memory.offset, ctx.text_len);
-        asm_canary(4);
-        return;
-    }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {
         ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
         ctx.text[ctx.text_len++] = 0x8D;
         ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
         memcpy(&ctx.text[ctx.text_len], &b.memory.offset, 4);
         ctx.text_len += 4;
+        return;
+    }
+    if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_LOCAL) {
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x8D;
+        ctx.text[ctx.text_len++] = modrm(0, a.reg.i & 0b111, RM_DI);
+        relocation_add_local(PC32, b.memory.offset, ctx.text_len);
+        asm_canary(4);
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_GLOBAL) {
@@ -197,6 +197,18 @@ void asm_mov(Operand_ a, Operand_ b) {
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_LOCAL) {
         asm_lea(a, b);
+        return;
+    }
+    if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_GLOBAL) {
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x8B;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT, a.reg.i & 0b111, RM_DI);
+        ctx.global_relocations[ctx.global_relocations_len++] = (SymbolRelocation){
+            .symbol = b.memory.symbol,
+            .type = GOTPCREL,
+            .offset = ctx.text_len,
+        };
+        asm_canary(4);
         return;
     }
     if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == REL_RBP) {

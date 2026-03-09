@@ -226,18 +226,26 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                 case OP_DEREFERENCE: {
                     if (o.rvalue.tag == MEMORY) {
                         res.lvalue = expr_registers[ctx.expr_registers_busy++];
-                        res.lvalue.reg.indirect = true;
                         asm_mov(res.lvalue, o.rvalue);
 
+                        res.lvalue.reg.indirect = true;
                         res.rvalue = expr_registers[ctx.expr_registers_busy++];
                         asm_mov(res.rvalue, res.lvalue);
 
                         expr.operand = res;
                         break;
                     }
+                    if (o.rvalue.tag == REGISTER) {
+                        res.lvalue = expr_registers[ctx.expr_registers_busy++];
+                        asm_mov(res.lvalue, o.rvalue);
 
-                    fprintf(stderr, "TODO dereference %d\n", op.tag);
-                    return (Expr){};
+                        res.lvalue.reg.indirect = true;
+                        res.rvalue = expr_registers[ctx.expr_registers_busy++];
+                        asm_mov(res.rvalue, res.lvalue);
+
+                        expr.operand = res;
+                        break;
+                    }
                     break;
                 }
                 case OP_ADDRESS_OF: {

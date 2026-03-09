@@ -7,6 +7,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "sys/param.h"
+#include "errno.h"
 
 typedef struct {
     size_t start;
@@ -214,8 +215,9 @@ typedef struct {
 } Scope;
 
 typedef enum {
-    PC32 = 2,
-    PLT32 = 4,
+    PC32 = 0x2,
+    PLT32 = 0x4,
+    GOTPCREL = 0x9,
 } ElfRelocationType;
 
 typedef struct {
