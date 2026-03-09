@@ -141,6 +141,11 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     asm_sub(out.rvalue, o2.rvalue);
                     break;
                 }
+                case OP_MUL: {
+                    asm_mov(out.rvalue, o1.rvalue);
+                    asm_imul(out.rvalue, o2.rvalue);
+                    break;
+                }
                 case OP_LE: {
                     asm_mov(out.rvalue, immediate(0));
                     asm_cmp(o1.rvalue, o2.rvalue);

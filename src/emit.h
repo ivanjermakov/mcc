@@ -333,6 +333,30 @@ void asm_sub(Operand_ a, Operand_ b) {
     asm_nop();
 }
 
+void asm_imul(Operand_ a, Operand_ b) {
+    if (a.tag != REGISTER) {
+        Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
+        asm_mov(tmp, a);
+        asm_imul(tmp, b);
+        ctx.expr_registers_busy--;
+        return;
+    }
+    Operand_ tmp = b;
+    if (b.tag != REGISTER) {
+        tmp = expr_registers[ctx.expr_registers_busy];
+        asm_mov(tmp, b);
+    }
+    if (a.tag == REGISTER) {
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, tmp.reg.i >= 8);
+        ctx.text[ctx.text_len++] = 0x0F;
+        ctx.text[ctx.text_len++] = 0xAF;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, a.reg.i & 0b111, tmp.reg.i);
+        return;
+    }
+    fprintf(stderr, "TODO asm_imul %d %d\n", a.tag, b.tag);
+    asm_nop();
+}
+
 void asm_push(Operand_ a) {
     if (a.tag == REGISTER) {
         if (a.reg.i >= 8) {

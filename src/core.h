@@ -167,6 +167,7 @@ typedef enum {
 typedef enum {
     OP_ADD = 1,
     OP_SUB,
+    OP_MUL,
     OP_EQ,
     OP_NEQ,
     OP_GT,
@@ -196,6 +197,7 @@ uint8_t operator_precedence[] = {
     0,
     4,  // OP_ADD
     4,  // OP_SUB
+    3,  // OP_MUL
     7,  // OP_EQ
     7,  // OP_NEQ
     6,  // OP_GT
@@ -223,6 +225,7 @@ uint8_t operator_associativity[] = {
     0,
     ASSOC_LEFT,  // OP_ADD
     ASSOC_LEFT,  // OP_SUB
+    ASSOC_LEFT,  // OP_MUL
     ASSOC_LEFT,  // OP_EQ
     ASSOC_LEFT,  // OP_NEQ
     ASSOC_LEFT,  // OP_GT

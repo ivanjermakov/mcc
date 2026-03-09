@@ -19,6 +19,7 @@ int main() {
     assert(2 + 2 == 4);
     assert(2 - 2 == 0);
     assert(0 - 2 == -2);
+    assert(2 * 3 == 6);
 
     assert(1 < 2);
     assert(1 <= 2);
