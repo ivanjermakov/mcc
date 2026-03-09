@@ -274,7 +274,7 @@ typedef struct {
     /**
      * Source code, compiler input
      */
-    char input[1 << 10];
+    char input[1 << 14];
     /**
      * Length of `input`
      */
@@ -305,7 +305,7 @@ typedef struct {
     /**
      * .text ELF file section
      */
-    uint8_t text[1 << 10];
+    uint8_t text[1 << 16];
     size_t text_len;
     /**
      * .rodata ELF file section

@@ -535,7 +535,7 @@ void asm_xor(Operand_ a, Operand_ b) {
 }
 
 void write_elf(FILE* out_file) {
-    uint8_t sections[1 << 14] = {0};
+    uint8_t sections[1 << 16] = {0};
     size_t sections_len = 0;
 
     uint64_t section_text_offset = sizeof elf_header + sections_len;
