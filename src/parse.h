@@ -508,20 +508,20 @@ bool visit_statement() {
         bool ok = visit_return();
         if (!ok) return false;
     } else {
-        size_t token_pos_old = ctx.token_pos;
+        Context ctx_old = ctx;
         if (visit_type().ok) {
             if (visit_ident().ok) {
                 if (ctx.tokens[ctx.token_pos].type == SEMI ||
                     ctx.tokens[ctx.token_pos].type == EQUALS ||
                     ctx.tokens[ctx.token_pos].type == O_BRACKET) {
-                    ctx.token_pos = token_pos_old;
+                    ctx = ctx_old;
                     bool ok = visit_var_def();
                     if (!ok) return false;
                     return true;
                 }
             }
         }
-        ctx.token_pos = token_pos_old;
+        ctx = ctx_old;
 
         Expr expr = visit_expr();
         if (!expr.ok) return expr.ok;
@@ -702,16 +702,24 @@ bool visit_var_def() {
 
 // program = (var_def | func_def)+
 bool visit_program() {
+    bool ok;
     stack_push();
     while (ctx.token_pos < ctx.tokens_len) {
-        // TODO: dry-parse type to figure out correct offset
-        if (ctx.tokens[ctx.token_pos + 2].type == O_PAREN ||
-            ctx.tokens[ctx.token_pos + 3].type == O_PAREN) {
-            bool ok = visit_func_def();
-            if (!ok) return ok;
-        } else if (ctx.tokens[ctx.token_pos + 2].type == SEMI) {
-            bool ok = visit_var_def();
-            if (!ok) return ok;
+        Context ctx_old = ctx;
+        visit_type();
+        visit_ident();
+        bool is_func_def = ctx.tokens[ctx.token_pos].type == O_PAREN;
+        if (ctx.tokens[ctx.token_pos].type == O_BRACKET) visit_array_size();
+        bool is_var_def =
+            ctx.tokens[ctx.token_pos].type == EQUALS || ctx.tokens[ctx.token_pos].type == SEMI;
+        ctx = ctx_old;
+
+        if (is_func_def) {
+            ok = visit_func_def();
+            if (!ok) return false;
+        } else if (is_var_def) {
+            ok = visit_var_def();
+            if (!ok) return false;
         } else {
             fprintf(stderr, "unexpected token when parsing program at %zu: %s\n",
                     ctx.tokens[ctx.token_pos].span.start,
