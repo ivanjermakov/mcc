@@ -143,7 +143,7 @@ Expr visit_string() {
         .rvalue =
             {
                 .tag = MEMORY,
-                .memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx},
+                .memory = {.mode = SYMBOL_LOCAL, .offset = symbol_idx, .relocation = R_PC32},
             },
     };
     memcpy(&ctx.rodata[ctx.rodata_len], &str_buf, str_len);
@@ -329,7 +329,7 @@ Expr visit_operand() {
         if (symbol->entry.name != 0) {
             Operand_ rel = {
                 .tag = MEMORY,
-                .memory = {.mode = SYMBOL_GLOBAL, .symbol = symbol},
+                .memory = {.mode = SYMBOL_GLOBAL, .relocation = R_GOTPCREL, .symbol = symbol},
             };
             Operand tmp = {
                 .lvalue = expr_registers[ctx.expr_registers_busy++],

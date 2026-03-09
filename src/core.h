@@ -83,6 +83,12 @@ typedef struct {
 } OperandImmediate;
 
 typedef enum {
+    R_PC32 = 0x2,
+    R_PLT32 = 0x4,
+    R_GOTPCREL = 0x9,
+} ElfRelocationType;
+
+typedef enum {
     REL_RIP = 1,
     REL_RBP,
     SYMBOL_LOCAL,
@@ -98,6 +104,10 @@ typedef struct {
      * In case mode == SYMBOL_GLOBAL
      */
     Symbol* symbol;
+    /**
+     * In case mode == SYMBOL_LOCAL || mode == SYMBOL_GLOBAL
+     */
+    ElfRelocationType relocation;
 } OperandMemory;
 
 typedef struct {
@@ -213,12 +223,6 @@ typedef struct {
     size_t symbols_start;
     int64_t bp_offset;
 } Scope;
-
-typedef enum {
-    PC32 = 0x2,
-    PLT32 = 0x4,
-    GOTPCREL = 0x9,
-} ElfRelocationType;
 
 typedef struct {
     Symbol* symbol;
