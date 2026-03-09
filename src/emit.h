@@ -42,7 +42,6 @@ void relocation_add_local(ElfRelocationType type, size_t symbol_index, size_t of
         .offset = offset,
         .type = type,
         .sym = symbol_index,
-        // TODO: explain
         .addend = -4,
     };
 }
@@ -129,6 +128,18 @@ void asm_lea(Operand_ a, Operand_ b) {
         ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT_DISP32, a.reg.i & 0b111, RM_DI);
         memcpy(&ctx.text[ctx.text_len], &b.memory.offset, 4);
         ctx.text_len += 4;
+        return;
+    }
+    if (a.tag == REGISTER && b.tag == MEMORY && b.memory.mode == SYMBOL_GLOBAL) {
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x8D;
+        ctx.text[ctx.text_len++] = modrm(MOD_INDIRECT, a.reg.i & 0b111, RM_DI);
+        ctx.global_relocations[ctx.global_relocations_len++] = (SymbolRelocation){
+            .symbol = b.memory.symbol,
+            .type = PLT32,
+            .offset = ctx.text_len,
+        };
+        asm_canary(4);
         return;
     }
     fprintf(stderr, "TODO asm_lea %d %d\n", a.tag, b.tag);
@@ -544,7 +555,6 @@ void write_elf(FILE* out_file) {
             .offset = sym.offset,
             .type = sym.type,
             .sym = sym.symbol->index,
-            // TODO: explain
             .addend = -4,
 
         };

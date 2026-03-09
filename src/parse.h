@@ -322,14 +322,34 @@ Expr visit_operand() {
         Ident ident = visit_ident();
         if (!ident.ok) return expr;
         Symbol* symbol = symbol_find(ident.span);
-        if (symbol == NULL) return expr;
-        if (symbol->count > 0) {
-            Operand tmp = {.rvalue = expr_registers[ctx.expr_registers_busy++],
-                           .lvalue = symbol->operand.lvalue};
-            asm_lea(tmp.rvalue, symbol->operand.rvalue);
+        if (symbol == NULL) {
+            fprintf(stderr, "name not found\n");
+            return expr;
+        }
+        if (symbol->entry.name != 0) {
+            Operand_ rel = {
+                .tag = MEMORY,
+                .memory = {.mode = SYMBOL_GLOBAL, .symbol = symbol},
+            };
+            Operand tmp = {
+                .lvalue = expr_registers[ctx.expr_registers_busy++],
+                .rvalue = expr_registers[ctx.expr_registers_busy++],
+            };
+            asm_lea(tmp.lvalue, rel);
+            tmp.lvalue.reg.indirect = true;
+            asm_mov(tmp.rvalue, tmp.lvalue);
             expr.operand = tmp;
         } else {
-            expr.operand = symbol->operand;
+            if (symbol->count > 0) {
+                Operand tmp = {
+                    .rvalue = expr_registers[ctx.expr_registers_busy++],
+                    .lvalue = symbol->operand.lvalue,
+                };
+                asm_lea(tmp.rvalue, symbol->operand.rvalue);
+                expr.operand = tmp;
+            } else {
+                expr.operand = symbol->operand;
+            }
         }
     } else if (t.type == INT) {
         Int i = visit_int();
@@ -446,7 +466,6 @@ Expr visit_call() {
     Symbol* symbol = symbol_find(name.span);
     if (symbol == NULL) {
         fprintf(stderr, "name not found\n");
-        fprintf(stderr, "\n");
         return call;
     }
 
@@ -688,7 +707,7 @@ bool visit_var_def() {
     }
 
     if (ctx.stack_len == 1) {
-        symbol_add_global(name.span, ctx.text_len, true);
+        symbol_add_global(name.span, ctx.text_len, false);
         if (expr.ok) {
             fprintf(stderr, "TODO global assign\n");
         }

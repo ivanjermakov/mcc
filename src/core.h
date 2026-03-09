@@ -88,9 +88,15 @@ typedef enum {
     SYMBOL_GLOBAL,
 } AddressingMode;
 
+typedef struct Symbol Symbol;
+
 typedef struct {
     AddressingMode mode;
     int64_t offset;
+    /**
+     * In case mode == SYMBOL_GLOBAL
+     */
+    Symbol* symbol;
 } OperandMemory;
 
 typedef struct {
@@ -192,7 +198,7 @@ uint8_t operator_associativity[] = {
     ASSOC_RIGHT, // OP_DEREFERENCE
 };
 
-typedef struct {
+struct Symbol {
     Span span;
     Operand operand;
     size_t size;
@@ -200,7 +206,7 @@ typedef struct {
     size_t item_size;
     size_t index;
     ElfSymbolEntry entry;
-} Symbol;
+};
 
 typedef struct {
     size_t symbols_start;
