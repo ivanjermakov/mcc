@@ -20,5 +20,12 @@ int main() {
     assert(2 - 2 == 0);
     assert(0 - 2 == -2);
 
+    assert(1 < 2);
+    assert(1 <= 2);
+    assert(2 <= 2);
+    assert(2 > 1);
+    assert(2 >= 1);
+    assert(2 >= 2);
+
     return 0;
 }

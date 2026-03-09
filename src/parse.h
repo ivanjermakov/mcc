@@ -247,9 +247,9 @@ Operator visit_op_infix() {
             if (ctx.tokens[ctx.token_pos].type == EQUALS) {
                 ctx.token_pos++;
                 op.tag = OP_LE;
-            } else {
-                op.tag = OP_LT;
+                return op;
             }
+            op.tag = OP_LT;
             return op;
         }
         case C_ANGLE: {
@@ -257,9 +257,9 @@ Operator visit_op_infix() {
             if (ctx.tokens[ctx.token_pos].type == EQUALS) {
                 ctx.token_pos++;
                 op.tag = OP_GE;
-            } else {
-                op.tag = OP_GT;
+                return op;
             }
+            op.tag = OP_GT;
             return op;
         }
         def:
