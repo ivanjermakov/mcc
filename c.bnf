@@ -12,7 +12,7 @@ return     = "return" expr ";"
 expr       = unary (op_infix unary)*
 unary      = op_prefix* operand op_postfix*
 operand    = IDENT | call | INT | string | char | "(" expr ")"
-call       = "(" expr ("," expr)* ")"
+call       = "(" (expr ("," expr)*)? ")"
 op_infix   = "=" "+" | "-" | "%" | "&" | "|" | "^" | "<<" | ">>" | "==" | "!=" | "<" | ">" | "<=" | ">="
 op_prefix  = "++" | "--" | "+" | "-" | "&" | "*"
 op_postfix = "++" | "--" | index

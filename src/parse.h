@@ -447,7 +447,7 @@ Expr visit_call() {
 
     ctx.token_pos++;
     int32_t arg_count = 0;
-    while (ctx.token_pos < ctx.tokens_len) {
+    while (ctx.token_pos < ctx.tokens_len && ctx.tokens[ctx.token_pos].type != C_PAREN) {
         Expr expr = visit_expr();
         if (!expr.ok) return call;
         if (ctx.tokens[ctx.token_pos].type == SEMI) ctx.token_pos++;
@@ -455,7 +455,6 @@ Expr visit_call() {
         asm_mov(argument_registers[arg_count], expr.operand.rvalue);
         arg_count++;
         if (ctx.tokens[ctx.token_pos].type == COMMA) ctx.token_pos++;
-        if (ctx.tokens[ctx.token_pos].type == C_PAREN) break;
     }
     ctx.token_pos++;
 
