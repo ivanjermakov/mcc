@@ -26,7 +26,7 @@ Symbol* symbol_find(Span span) {
         }
     }
     fprintf(stderr, "symbol \"%.*s\" not found at %zu\n", (int)span.len, &ctx.input[span.start],
-            span.start);
+            ctx.token_pos);
     return NULL;
 }
 
@@ -261,7 +261,7 @@ Operator visit_op_infix() {
     }
 }
 
-// op_prefix = "++" | "--" | "+" | "-" | "&" | "*"
+// op_prefix = "++" | "--" | "+" | "-" | "&" | "*" | "!"
 Operator visit_op_prefix() {
     Operator op = {.type = PREFIX};
     switch (ctx.tokens[ctx.token_pos].type) {
@@ -273,6 +273,11 @@ Operator visit_op_prefix() {
         case ASTERISK: {
             ctx.token_pos++;
             op.tag = OP_DEREFERENCE;
+            break;
+        }
+        case EXCL: {
+            ctx.token_pos++;
+            op.tag = OP_NOT;
             break;
         }
         default: {

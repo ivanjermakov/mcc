@@ -133,6 +133,7 @@ typedef enum {
     OP_REMAINDER,
     OP_AND,
     OP_OR,
+    OP_NOT,
     OP_ADDRESS_OF,
     OP_DEREFERENCE,
 } OperatorTag;
@@ -160,6 +161,7 @@ uint8_t operator_precedence[] = {
     3,  // OP_REMAINDER
     11, // OP_AND
     12, // OP_OR
+    2,  // OP_NOT
     2,  // OP_ADDRESS_OF
     2,  // OP_DEREFERENCE
 };
@@ -185,6 +187,7 @@ uint8_t operator_associativity[] = {
     ASSOC_LEFT,  // OP_REMAINDER
     ASSOC_LEFT,  // OP_AND
     ASSOC_LEFT,  // OP_OR
+    ASSOC_RIGHT, // OP_NOT
     ASSOC_RIGHT, // OP_ADDRESS_OF
     ASSOC_RIGHT, // OP_DEREFERENCE
 };

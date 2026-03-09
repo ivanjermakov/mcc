@@ -475,6 +475,19 @@ void asm_idiv(Operand_ a) {
     asm_nop();
 }
 
+void asm_xor(Operand_ a, Operand_ b) {
+    if (a.tag == REGISTER && b.tag == IMMEDIATE && immediate_fits_i32(b.immediate)) {
+        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = 0x81;
+        ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, 6, a.reg.i & 0b111);
+        memcpy(&ctx.text[ctx.text_len], &b.immediate.value, 4);
+        ctx.text_len += 4;
+        return;
+    }
+    fprintf(stderr, "TODO asm_xor %d %d\n", a.tag, b.tag);
+    asm_nop();
+}
+
 void write_elf(FILE* out_file) {
     uint8_t sections[1 << 14] = {0};
     size_t sections_len = 0;

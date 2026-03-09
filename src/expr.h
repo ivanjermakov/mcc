@@ -247,6 +247,14 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     expr.operand = res;
                     break;
                 }
+                case OP_NOT: {
+                    Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
+                    asm_mov(tmp, o.rvalue);
+                    asm_xor(tmp, immediate(1));
+                    res.rvalue = tmp;
+                    expr.operand = res;
+                    break;
+                }
                 default: {
                     fprintf(stderr, "TODO prefix op %d\n", op.tag);
                     return (Expr){};
