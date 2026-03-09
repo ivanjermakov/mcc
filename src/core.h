@@ -33,6 +33,7 @@ typedef enum {
     C_BRACKET,
     COMMA,
     ASTERISK,
+    SLASH,
     AMPERSAND,
     IF,
     ELSE,
@@ -67,6 +68,7 @@ const char* token_literal[] = {
     "]",      // C_BRACKET
     ",",      // COMMA
     "*",      // ASTERISK
+    "/",      // SLASH
     "&",      // AMPERSAND
     "if",     // IF
     "else",   // ELSE
@@ -84,10 +86,10 @@ const char* token_literal[] = {
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
 
 const char* token_name[] = {
-    "NONE",  "IDENT",    "INT",       "STRING_PART", "CHAR",    "ESCAPE",  "HASH",      "SEMI",
-    "QUOTE", "DQUOTE",   "O_BRACE",   "C_BRACE",     "O_PAREN", "C_PAREN", "O_BRACKET", "C_BRACKET",
-    "COMMA", "ASTERISK", "AMPERSAND", "IF",          "ELSE",    "WHILE",   "RETURN",    "PLUS",
-    "MINUS", "EQUALS",   "O_ANGLE",   "C_ANGLE",     "EXCL",    "PERIOD",  "PERCENT"};
+    "NONE",  "IDENT",    "INT",     "STRING_PART", "CHAR",    "ESCAPE",  "HASH",      "SEMI",
+    "QUOTE", "DQUOTE",   "O_BRACE", "C_BRACE",     "O_PAREN", "C_PAREN", "O_BRACKET", "C_BRACKET",
+    "COMMA", "ASTERISK", "SLASH",   "AMPERSAND",   "IF",      "ELSE",    "WHILE",     "RETURN",
+    "PLUS",  "MINUS",    "EQUALS",  "O_ANGLE",     "C_ANGLE", "EXCL",    "PERIOD",    "PERCENT"};
 
 typedef struct {
     Span span;
@@ -168,6 +170,7 @@ typedef enum {
     OP_ADD = 1,
     OP_SUB,
     OP_MUL,
+    OP_DIV,
     OP_EQ,
     OP_NEQ,
     OP_GT,
@@ -198,6 +201,7 @@ uint8_t operator_precedence[] = {
     4,  // OP_ADD
     4,  // OP_SUB
     3,  // OP_MUL
+    3,  // OP_DIV
     7,  // OP_EQ
     7,  // OP_NEQ
     6,  // OP_GT
@@ -226,6 +230,7 @@ uint8_t operator_associativity[] = {
     ASSOC_LEFT,  // OP_ADD
     ASSOC_LEFT,  // OP_SUB
     ASSOC_LEFT,  // OP_MUL
+    ASSOC_LEFT,  // OP_DIV
     ASSOC_LEFT,  // OP_EQ
     ASSOC_LEFT,  // OP_NEQ
     ASSOC_LEFT,  // OP_GT

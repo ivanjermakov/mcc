@@ -232,6 +232,11 @@ Operator visit_op_infix() {
             op.tag = OP_MUL;
             return op;
         }
+        case SLASH: {
+            ctx.token_pos++;
+            op.tag = OP_DIV;
+            return op;
+        }
         case PERCENT: {
             ctx.token_pos++;
             op.tag = OP_REMAINDER;

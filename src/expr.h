@@ -146,6 +146,22 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     asm_imul(out.rvalue, o2.rvalue);
                     break;
                 }
+                case OP_DIV: {
+                    asm_push(RAX);
+                    asm_push(RDX);
+
+                    asm_mov(RAX, o1.rvalue);
+                    asm_mov(RDX, immediate(0));
+                    asm_idiv(o2.rvalue);
+                    Operand tmp = stack_alloc(8);
+                    asm_mov(tmp.rvalue, RAX);
+
+                    asm_pop(RDX);
+                    asm_pop(RAX);
+
+                    expr.operand = tmp;
+                    break;
+                }
                 case OP_LE: {
                     asm_mov(out.rvalue, immediate(0));
                     asm_cmp(o1.rvalue, o2.rvalue);
