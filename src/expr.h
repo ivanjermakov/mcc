@@ -205,7 +205,9 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     break;
                 }
                 case OP_NEQ: {
-                    fprintf(stderr, "TODO op_neq\n");
+                    asm_mov(out.rvalue, immediate(0));
+                    asm_cmp(o1.rvalue, o2.rvalue);
+                    asm_setne(out.rvalue);
                     break;
                 }
                 case OP_ASSIGN: {

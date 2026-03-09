@@ -205,13 +205,17 @@ Operator visit_op_infix() {
                 op.tag = OP_EQ;
                 return op;
             }
-            if (ctx.tokens[ctx.token_pos].type == EXCL) {
+            op.tag = OP_ASSIGN;
+            return op;
+        }
+        case EXCL: {
+            ctx.token_pos++;
+            if (ctx.tokens[ctx.token_pos].type == EQUALS) {
                 ctx.token_pos++;
                 op.tag = OP_NEQ;
                 return op;
             }
-            op.tag = OP_ASSIGN;
-            return op;
+            goto def;
         }
         case PLUS: {
             ctx.token_pos++;
@@ -258,6 +262,7 @@ Operator visit_op_infix() {
             }
             return op;
         }
+        def:
         default:
             fprintf(stderr, "unexpected token when parsing op_infix at %zu: %s\n",
                     ctx.tokens[ctx.token_pos].span.start,
