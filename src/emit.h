@@ -399,7 +399,7 @@ void asm_jmp(int32_t rel) {
 }
 
 void asm_cmp(Operand_ a, Operand_ b) {
-    if (a.tag == IMMEDIATE) {
+    if (a.tag != REGISTER) {
         Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
         asm_mov(tmp, a);
         asm_cmp(tmp, b);
@@ -413,7 +413,7 @@ void asm_cmp(Operand_ a, Operand_ b) {
     }
     if (a.tag == REGISTER) {
         ctx.text[ctx.text_len++] = rex(true, tmp.reg.i >= 8, false, a.reg.i >= 8);
-        ctx.text[ctx.text_len++] = 0x3B;
+        ctx.text[ctx.text_len++] = 0x39;
         ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, tmp.reg.i & 0b111, a.reg.i & 0b111);
         return;
     }

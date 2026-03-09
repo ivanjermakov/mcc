@@ -143,25 +143,25 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                 }
                 case OP_LE: {
                     asm_mov(out.rvalue, immediate(0));
-                    asm_cmp(o2.rvalue, o1.rvalue);
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setle(out.rvalue);
                     break;
                 }
                 case OP_LT: {
                     asm_mov(out.rvalue, immediate(0));
-                    asm_cmp(o2.rvalue, o1.rvalue);
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setl(out.rvalue);
                     break;
                 }
                 case OP_GE: {
                     asm_mov(out.rvalue, immediate(0));
-                    asm_cmp(o2.rvalue, o1.rvalue);
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setge(out.rvalue);
                     break;
                 }
                 case OP_GT: {
                     asm_mov(out.rvalue, immediate(0));
-                    asm_cmp(o2.rvalue, o1.rvalue);
+                    asm_cmp(o1.rvalue, o2.rvalue);
                     asm_setg(out.rvalue);
                     o1 = out;
                     break;
