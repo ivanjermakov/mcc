@@ -1,13 +1,13 @@
 #pragma once
 #include "assert.h"
 #include "elf.h"
+#include "errno.h"
 #include "stdbool.h"
 #include "stdint.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
 #include "sys/param.h"
-#include "errno.h"
 
 typedef struct {
     size_t start;
@@ -39,6 +39,7 @@ typedef enum {
     WHILE,
     RETURN,
     PLUS,
+    MINUS,
     EQUALS,
     O_ANGLE,
     C_ANGLE,
@@ -48,17 +49,45 @@ typedef enum {
 } TokenType;
 
 const char* token_literal[] = {
-    NULL, NULL, NULL, NULL, NULL, NULL,   "#",     ";",      "'", "\"", "{", "}", "(", ")", "[",
-    "]",  ",",  "*",  "&",  "if", "else", "while", "return", "+", "=",  "<", ">", "!", ".", "%",
+    NULL,     // NONE
+    NULL,     // IDENT
+    NULL,     // INT
+    NULL,     // STRING
+    NULL,     // CHAR
+    NULL,     // ESCAPE
+    "#",      // HASH
+    ";",      // SEMI
+    "'",      // QUOTE
+    "\"",     // DQUOTE
+    "{",      // O_BRACE
+    "}",      // C_BRACE
+    "(",      // O_PAREN
+    ")",      // C_PAREN
+    "[",      // O_BRACKET
+    "]",      // C_BRACKET
+    ",",      // COMMA
+    "*",      // ASTERISK
+    "&",      // AMPERSAND
+    "if",     // IF
+    "else",   // ELSE
+    "while",  // WHILE
+    "return", // RETURN
+    "+",      // PLUS
+    "-",      // MINUS
+    "=",      // EQUALS
+    "<",      // O_ANGLE
+    ">",      // C_ANGLE
+    "!",      // EXCL
+    ".",      // PERIOD
+    "%",      // PERCENT
 };
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
 
-const char* token_name[] = {"NONE",      "IDENT",   "INT",      "STRING_PART", "CHAR",
-                            "ESCAPE",    "HASH",    "SEMI",     "QUOTE",       "DQUOTE",
-                            "O_BRACE",   "C_BRACE", "O_PAREN",  "C_PAREN",     "O_BRACKET",
-                            "C_BRACKET", "COMMA",   "ASTERISK", "AMPERSAND",   "IF",
-                            "ELSE",      "WHILE",   "RETURN",   "PLUS",        "EQUALS",
-                            "O_ANGLE",   "C_ANGLE", "EXCL",     "PERIOD",      "PERCENT"};
+const char* token_name[] = {
+    "NONE",  "IDENT",    "INT",       "STRING_PART", "CHAR",    "ESCAPE",  "HASH",      "SEMI",
+    "QUOTE", "DQUOTE",   "O_BRACE",   "C_BRACE",     "O_PAREN", "C_PAREN", "O_BRACKET", "C_BRACKET",
+    "COMMA", "ASTERISK", "AMPERSAND", "IF",          "ELSE",    "WHILE",   "RETURN",    "PLUS",
+    "MINUS", "EQUALS",   "O_ANGLE",   "C_ANGLE",     "EXCL",    "PERIOD",  "PERCENT"};
 
 typedef struct {
     Span span;

@@ -218,6 +218,11 @@ Operator visit_op_infix() {
             op.tag = OP_ADD;
             return op;
         }
+        case MINUS: {
+            ctx.token_pos++;
+            op.tag = OP_SUB;
+            return op;
+        }
         case PERCENT: {
             ctx.token_pos++;
             op.tag = OP_REMAINDER;

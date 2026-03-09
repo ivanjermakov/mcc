@@ -14,5 +14,7 @@ void assert(int expr) {
 int main() {
     assert(0 == 0);
     assert(1 == 1);
+    assert(2 + 2 == 4);
+    assert(2 - 2 == 0);
     return 0;
 }
