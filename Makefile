@@ -12,6 +12,18 @@ test: build
 ci: build
 	./test.sh /usr/lib/x86_64-linux-gnu
 
+compile_test: build
+	build/mcc test/test.c build/test.o
+
+link_test: compile_test
+	ld $(LDFLAGS) build/test.o -o build/test
+
+run_test: link_test
+	build/test
+
+inspect_test:
+	objdump $(OBJDUMPFLAGS) build/test.o
+
 compile_hello: build
 	build/mcc test/hello.c build/hello.o
 
