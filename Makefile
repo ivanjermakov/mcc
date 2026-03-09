@@ -71,3 +71,15 @@ run_pass_by_ref: link_pass_by_ref
 
 inspect_pass_by_ref:
 	objdump $(OBJDUMPFLAGS) build/pass_by_ref.o
+
+compile_fprintf: build
+	build/mcc test/fprintf.c build/fprintf.o
+
+link_fprintf: compile_fprintf
+	ld $(LDFLAGS) build/fprintf.o -o build/fprintf
+
+run_fprintf: link_fprintf
+	build/fprintf
+
+inspect_fprintf:
+	objdump $(OBJDUMPFLAGS) build/fprintf.o
