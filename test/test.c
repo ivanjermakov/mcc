@@ -16,5 +16,6 @@ int main() {
     assert(1 == 1);
     assert(2 + 2 == 4);
     assert(2 - 2 == 0);
+    assert(0 - 2 == -2);
     return 0;
 }

@@ -148,7 +148,7 @@ void asm_lea(Operand_ a, Operand_ b) {
 
 void asm_mov(Operand_ a, Operand_ b) {
     if (a.tag == IMMEDIATE) {
-        fprintf(stderr, "asm_mov mov _\n");
+        fprintf(stderr, "mov imm _\n");
         assert(false);
         return;
     }
@@ -313,7 +313,7 @@ void asm_sub(Operand_ a, Operand_ b) {
             asm_sub(a, tmp);
             return;
         }
-        ctx.text[ctx.text_len++] = rex(true, a.reg.i >= 8, false, false);
+        ctx.text[ctx.text_len++] = rex(true, false, false, a.reg.i >= 8);
         ctx.text[ctx.text_len++] = 0x81;
         ctx.text[ctx.text_len++] = modrm(MOD_REGISTER, 5, a.reg.i & 0b111);
         int32_t i = b.immediate.value;
@@ -399,14 +399,14 @@ void asm_jmp(int32_t rel) {
 }
 
 void asm_cmp(Operand_ a, Operand_ b) {
-    Operand_ tmp = b;
     if (a.tag == IMMEDIATE) {
-        tmp = expr_registers[ctx.expr_registers_busy++];
+        Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
         asm_mov(tmp, a);
         asm_cmp(tmp, b);
         ctx.expr_registers_busy--;
         return;
     }
+    Operand_ tmp = b;
     if (b.tag != REGISTER) {
         tmp = expr_registers[ctx.expr_registers_busy];
         asm_mov(tmp, b);
@@ -436,9 +436,8 @@ void asm_test(Operand_ a, Operand_ b) {
 }
 
 void asm_setx(Operand_ a, uint8_t opcode) {
-    if (a.reg.i >= 8) {
-        ctx.text[ctx.text_len++] = rex(false, false, false, true);
-    }
+    // empty rex is always required to pick sil/dil/spl/bpl instead of ah/bh/ch/dh
+    ctx.text[ctx.text_len++] = rex(false, false, false, a.reg.i >= 8);
     if (a.tag == REGISTER) {
         ctx.text[ctx.text_len++] = 0x0F;
         ctx.text[ctx.text_len++] = opcode;

@@ -285,6 +285,11 @@ Operator visit_op_prefix() {
             op.tag = OP_NOT;
             break;
         }
+        case MINUS: {
+            ctx.token_pos++;
+            op.tag = OP_NEGATE;
+            break;
+        }
         default: {
         }
     }
@@ -375,7 +380,8 @@ Expr visit_operand() {
         ctx.token_pos++;
         expr.operand = sub_expr.operand;
     } else {
-        fprintf(stderr, "TODO %s\n", token_name[t.type]);
+        fprintf(stderr, "unexpected token when parsing operand: %s at %zu\n", token_name[t.type],
+                ctx.tokens[ctx.token_pos].span.start);
         return expr;
     }
     expr.ok = true;

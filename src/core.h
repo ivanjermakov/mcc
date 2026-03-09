@@ -182,6 +182,7 @@ typedef enum {
     OP_NOT,
     OP_ADDRESS_OF,
     OP_DEREFERENCE,
+    OP_NEGATE,
 } OperatorTag;
 
 typedef struct {
@@ -210,6 +211,7 @@ uint8_t operator_precedence[] = {
     2,  // OP_NOT
     2,  // OP_ADDRESS_OF
     2,  // OP_DEREFERENCE
+    2,  // OP_NEGATE
 };
 
 typedef enum {
@@ -236,6 +238,7 @@ uint8_t operator_associativity[] = {
     ASSOC_RIGHT, // OP_NOT
     ASSOC_RIGHT, // OP_ADDRESS_OF
     ASSOC_RIGHT, // OP_DEREFERENCE
+    ASSOC_RIGHT, // OP_NEGATE
 };
 
 struct Symbol {

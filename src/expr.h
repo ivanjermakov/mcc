@@ -108,9 +108,9 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
         if (op.type == INFIX) {
             // some operators require operands to be emitted left-to-right
             size_t o2_pos = *pos;
-            size_t text_pos = ctx.text_len;
+            Context ctx_old = ctx;
             visit_expr_(expr_stack, pos);
-            ctx.text_len = text_pos;
+            ctx = ctx_old;
 
             Operand o1 = visit_expr_(expr_stack, pos).operand;
             size_t end_pos = *pos;
@@ -132,13 +132,13 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
 
             switch (op.tag) {
                 case OP_ADD: {
-                    asm_mov(out.rvalue, o2.rvalue);
-                    asm_add(out.rvalue, o1.rvalue);
+                    asm_mov(out.rvalue, o1.rvalue);
+                    asm_add(out.rvalue, o2.rvalue);
                     break;
                 }
                 case OP_SUB: {
-                    asm_mov(out.rvalue, o2.rvalue);
-                    asm_sub(out.rvalue, o1.rvalue);
+                    asm_mov(out.rvalue, o1.rvalue);
+                    asm_sub(out.rvalue, o2.rvalue);
                     break;
                 }
                 case OP_LE: {
@@ -264,6 +264,14 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
                     asm_mov(tmp, o.rvalue);
                     asm_xor(tmp, immediate(1));
+                    res.rvalue = tmp;
+                    expr.operand = res;
+                    break;
+                }
+                case OP_NEGATE: {
+                    Operand_ tmp = expr_registers[ctx.expr_registers_busy++];
+                    asm_mov(tmp, immediate(0));
+                    asm_sub(tmp, o.rvalue);
                     res.rvalue = tmp;
                     expr.operand = res;
                     break;
