@@ -591,7 +591,6 @@ void write_elf(FILE* out_file) {
             .type = sym.type,
             .sym = sym.symbol->index,
             .addend = -4,
-
         };
         memcpy(&sections[sections_len], &entry, sizeof entry);
         sections_len += sizeof entry;

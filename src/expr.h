@@ -64,9 +64,11 @@ bool shunting_yard(ExprToken out_queue[], size_t* out_queue_size) {
                 // visit to advance ctx.token_pos, record operand_pos to "replay" emit later
                 expr_token.token_pos = ctx.token_pos;
 
-                size_t text_pos = ctx.text_len;
+                Context ctx_old = ctx;
                 Expr operand = visit_operand();
-                ctx.text_len = text_pos;
+                size_t token_pos_end = ctx.token_pos;
+                ctx = ctx_old;
+                ctx.token_pos = token_pos_end;
 
                 if (!operand.ok) return false;
                 out_queue[(*out_queue_size)++] = expr_token;
