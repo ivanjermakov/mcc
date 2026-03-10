@@ -120,11 +120,11 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
             Operand out = {.rvalue = expr_registers[ctx.expr_registers_busy++]};
             expr.operand = out;
 
-            size_t sc_je_pos;
-            if (op.tag == OP_AND) {
-                asm_mov(out.rvalue, immediate(0));
+            size_t short_circuit_pos;
+            if (op.tag == OP_AND || op.tag == OP_OR) {
+                asm_mov(out.rvalue, immediate(op.tag == OP_AND ? 0 : 1));
                 asm_cmp(o1.rvalue, immediate(0));
-                sc_je_pos = ctx.text_len;
+                short_circuit_pos = ctx.text_len;
                 asm_canary(6);
             }
 
@@ -205,20 +205,21 @@ Expr visit_expr_(ExprToken expr_stack[], size_t* pos) {
                     expr.operand = tmp_stack;
                     break;
                 }
-                case OP_AND: {
-                    // at this point, o1 is guaranteed to be true, so out = o2
+                case OP_AND:
+                case OP_OR: {
+                    // short circuit failed, now out = o2
                     asm_mov(out.rvalue, o2.rvalue);
 
-                    // patch short circuit je
+                    // patch short circuit jump to here
                     size_t text_size_bak = ctx.text_len;
-                    ctx.text_len = sc_je_pos;
-                    asm_je(text_size_bak - sc_je_pos - 6);
+                    ctx.text_len = short_circuit_pos;
+                    if (op.tag == OP_AND) {
+                        asm_je(text_size_bak - short_circuit_pos - 6);
+                    } else {
+                        asm_jne(text_size_bak - short_circuit_pos - 6);
+                    }
                     ctx.text_len = text_size_bak;
 
-                    break;
-                }
-                case OP_OR: {
-                    fprintf(stderr, "TODO op_or\n");
                     break;
                 }
                 case OP_EQ: {

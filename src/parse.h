@@ -252,6 +252,15 @@ Operator visit_op_infix() {
             }
             return op;
         }
+        case PIPE: {
+            ctx.token_pos++;
+            if (ctx.tokens[ctx.token_pos].type == PIPE) {
+                ctx.token_pos++;
+                op.tag = OP_OR;
+                return op;
+            }
+            goto def;
+        }
         case O_ANGLE: {
             ctx.token_pos++;
             if (ctx.tokens[ctx.token_pos].type == EQUALS) {

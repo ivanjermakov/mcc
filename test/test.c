@@ -29,5 +29,16 @@ int main() {
     assert(2 >= 1);
     assert(2 >= 2);
 
+    assert(1);
+    assert(!0);
+    assert(!(0 && 0));
+    assert(!(0 && 1));
+    assert(!(1 && 0));
+    assert(1 && 1);
+    assert(!(0 || 0));
+    assert(0 || 1);
+    assert(1 || 0);
+    assert(1 || 1);
+
     return 0;
 }

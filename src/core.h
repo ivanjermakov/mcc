@@ -35,6 +35,7 @@ typedef enum {
     ASTERISK,
     SLASH,
     AMPERSAND,
+    PIPE,
     IF,
     ELSE,
     WHILE,
@@ -70,6 +71,7 @@ const char* token_literal[] = {
     "*",      // ASTERISK
     "/",      // SLASH
     "&",      // AMPERSAND
+    "|",      // PIPE
     "if",     // IF
     "else",   // ELSE
     "while",  // WHILE
@@ -86,10 +88,11 @@ const char* token_literal[] = {
 size_t token_literal_size = sizeof token_literal / sizeof token_literal[0];
 
 const char* token_name[] = {
-    "NONE",  "IDENT",    "INT",     "STRING_PART", "CHAR",    "ESCAPE",  "HASH",      "SEMI",
-    "QUOTE", "DQUOTE",   "O_BRACE", "C_BRACE",     "O_PAREN", "C_PAREN", "O_BRACKET", "C_BRACKET",
-    "COMMA", "ASTERISK", "SLASH",   "AMPERSAND",   "IF",      "ELSE",    "WHILE",     "RETURN",
-    "PLUS",  "MINUS",    "EQUALS",  "O_ANGLE",     "C_ANGLE", "EXCL",    "PERIOD",    "PERCENT"};
+    "NONE",      "IDENT",     "INT",    "STRING_PART", "CHAR",    "ESCAPE",    "HASH",
+    "SEMI",      "QUOTE",     "DQUOTE", "O_BRACE",     "C_BRACE", "O_PAREN",   "C_PAREN",
+    "O_BRACKET", "C_BRACKET", "COMMA",  "ASTERISK",    "SLASH",   "AMPERSAND", "PIPE",
+    "IF",        "ELSE",      "WHILE",  "RETURN",      "PLUS",    "MINUS",     "EQUALS",
+    "O_ANGLE",   "C_ANGLE",   "EXCL",   "PERIOD",      "PERCENT"};
 
 typedef struct {
     Span span;
